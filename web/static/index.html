@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live – UTRA Match</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1 class="site-title">UTRA Match</h1>
+    <nav class="site-nav">
+      <a href="/" class="active">Live</a>
+      <a href="/breakdown">Score breakdown</a>
+      <a href="/leaderboard">Leaderboard</a>
+    </nav>
+  </header>
+
+  <main class="main-content">
+    <div class="panel">
+      <div class="team-display" id="team-display">Team —</div>
+      <div class="score-display">Score: <span id="score">0</span></div>
+      <div class="timer-display">Time: <span id="timer">00:00</span></div>
+      <p class="note">Press <strong>Start timer</strong> below to begin the match, or press Space on the machine running the server.</p>
+      <div class="controls-row">
+        <button type="button" id="btn-start-timer">Start timer</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 style="margin-top:0;">Set team number (before each match)</h2>
+      <div class="controls-row">
+        <label>Team number: <input type="text" id="team-number" value="1" placeholder="e.g. 12" /></label>
+        <button type="button" id="btn-set-team">Set team</button>
+        <span id="set-team-feedback" class="note"></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 style="margin-top:0;">Live stream</h2>
+      <div class="video-container">
+        <img src="/stream" alt="Live stream with HUD" />
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 style="margin-top:0;">Test controls (set breakdown without CV)</h2>
+      <div class="controls-row">
+        <label>Obstacle touches: <input type="number" id="obstacle-touches" min="0" value="0" /></label>
+        <label>Completed under 60s: <input type="checkbox" id="completed-under60" /></label>
+        <label>Box drop:
+          <select id="box-drop">
+            <option value="">—</option>
+            <option value="fully_in">Fully in (5)</option>
+            <option value="partially_touching">Partially touching (4)</option>
+            <option value="mostly_out">Mostly out (1)</option>
+          </select>
+        </label>
+        <button type="button" id="btn-set-breakdown">Apply</button>
+        <button type="button" id="btn-save-run">Save run to leaderboard</button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    function renderState(state) {
+      document.getElementById('team-display').textContent = state.team_display || ('Team ' + (state.team_number || '—'));
+      document.getElementById('score').textContent = state.score_total ?? 0;
+      document.getElementById('timer').textContent = formatTime(state.t_elapsed_s ?? 0);
+    }
+
+    async function pollState() {
+      try {
+        const r = await fetch('/api/state');
+        const state = await r.json();
+        renderState(state);
+      } catch (e) {}
+    }
+
+    document.getElementById('btn-start-timer').onclick = async () => {
+      try {
+        const r = await fetch('/api/timer/start', { method: 'POST' });
+        const state = await r.json();
+        renderState(state);
+      } catch (e) {}
+    };
+
+    document.getElementById('btn-set-team').onclick = async () => {
+      const num = document.getElementById('team-number').value.trim();
+      const feedback = document.getElementById('set-team-feedback');
+      if (!num) {
+        feedback.textContent = 'Enter a team number.';
+        return;
+      }
+      try {
+        const r = await fetch('/api/set_team', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ team_number: num }),
+        });
+        if (!r.ok) {
+          feedback.textContent = 'Failed to set team.';
+          return;
+        }
+        const state = await r.json();
+        renderState(state);
+        feedback.textContent = 'Team set to ' + (state.team_display || state.team_number) + '.';
+        setTimeout(() => { feedback.textContent = ''; }, 3000);
+      } catch (e) {
+        feedback.textContent = 'Error: ' + e.message;
+      }
+    };
+
+    document.getElementById('btn-set-breakdown').onclick = async () => {
+      const obstacle = parseInt(document.getElementById('obstacle-touches').value, 10) || 0;
+      const under60 = document.getElementById('completed-under60').checked;
+      const box = document.getElementById('box-drop').value || null;
+      try {
+        await fetch('/api/test/set_breakdown', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ obstacle_touches: obstacle, completed_under_60: under60, box_drop: box || null }),
+        });
+        pollState();
+      } catch (e) {}
+    };
+
+    document.getElementById('btn-save-run').onclick = async () => {
+      try {
+        await fetch('/api/test/save_run', { method: 'POST' });
+        pollState();
+      } catch (e) {}
+    };
+
+    setInterval(pollState, 500);
+    pollState();
+  </script>
+</body>
+</html>

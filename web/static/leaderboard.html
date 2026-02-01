@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leaderboard – UTRA Match</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1 class="site-title">UTRA Match</h1>
+    <nav class="site-nav">
+      <a href="/">Live</a>
+      <a href="/breakdown">Score breakdown</a>
+      <a href="/leaderboard" class="active">Leaderboard</a>
+    </nav>
+  </header>
+
+  <main class="main-content">
+    <div class="panel">
+      <h2 style="margin-top:0;">Leaderboard</h2>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Team</th>
+            <th style="text-align:right;">Score</th>
+            <th style="text-align:right;">Time</th>
+            <th>Obstacle</th>
+            <th>Under 60s</th>
+            <th>Box drop</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard-body"></tbody>
+      </table>
+      <p class="note" id="empty-msg">No runs saved yet. Save a run from the Live page.</p>
+    </div>
+  </main>
+
+  <script>
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    async function pollLeaderboard() {
+      try {
+        const r = await fetch('/api/leaderboard');
+        const list = await r.json();
+        const tbody = document.getElementById('leaderboard-body');
+        const emptyMsg = document.getElementById('empty-msg');
+        if (!list || list.length === 0) {
+          tbody.innerHTML = '';
+          emptyMsg.style.display = 'block';
+          return;
+        }
+        emptyMsg.style.display = 'none';
+        tbody.innerHTML = list.map((row, i) => {
+          const b = row.score_breakdown || {};
+          return '<tr><td>' + (i + 1) + '</td><td>' + (row.team_display || row.team_number) + '</td><td style="text-align:right;">' + row.score_total + '</td><td style="text-align:right;">' + formatTime(row.t_elapsed_s || 0) + '</td><td>' + (b.obstacle ?? 0) + '</td><td>' + (b.completed_under_60 ?? 0) + '</td><td>' + (b.box_drop ?? 0) + '</td></tr>';
+        }).join('');
+      } catch (e) {}
+    }
+    setInterval(pollLeaderboard, 2000);
+    pollLeaderboard();
+  </script>
+</body>
+</html>

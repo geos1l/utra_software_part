@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Score breakdown – UTRA Match</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1 class="site-title">UTRA Match</h1>
+    <nav class="site-nav">
+      <a href="/">Live</a>
+      <a href="/breakdown" class="active">Score breakdown</a>
+      <a href="/leaderboard">Leaderboard</a>
+    </nav>
+  </header>
+
+  <main class="main-content">
+    <div class="panel">
+      <h2 style="margin-top:0;" id="breakdown-title">Score breakdown — Team —</h2>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th style="text-align:right;">Points</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Obstacle (5 − touches)</td><td style="text-align:right;" id="bd-obstacle">0</td></tr>
+          <tr><td>Completed under 60s</td><td style="text-align:right;" id="bd-under60">0</td></tr>
+          <tr><td>Box drop</td><td style="text-align:right;" id="bd-box">0</td></tr>
+          <tr class="total-row"><td>Total</td><td style="text-align:right;" id="bd-total">0</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script>
+    async function pollState() {
+      try {
+        const r = await fetch('/api/state');
+        const state = await r.json();
+        document.getElementById('breakdown-title').textContent = 'Score breakdown — ' + (state.team_display || ('Team ' + (state.team_number || '—')));
+        const bd = state.score_breakdown || {};
+        document.getElementById('bd-obstacle').textContent = bd.obstacle ?? 0;
+        document.getElementById('bd-under60').textContent = bd.completed_under_60 ?? 0;
+        document.getElementById('bd-box').textContent = bd.box_drop ?? 0;
+        document.getElementById('bd-total').textContent = state.score_total ?? 0;
+      } catch (e) {}
+    }
+    setInterval(pollState, 500);
+    pollState();
+  </script>
+</body>
+</html>

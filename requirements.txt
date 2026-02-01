@@ -1,2 +1,10 @@
 opencv-python>=4.8.0
 numpy>=1.24.0
+python-dotenv
+openai
+elevenlabs
+sounddevice
+scipy
+fastapi
+uvicorn
+keyboard>=0.13.5
