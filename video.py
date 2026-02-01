@@ -353,7 +353,7 @@ class SimpleObstacleCourseTracker:
         print("\n🔄 Score reset!")
 
 
-def run_obstacle_course_tracker(video_source=1):
+def run_obstacle_course_tracker(video_source=2):
     """
     Main function to run the tracker
     video_source: 0 for webcam, or path to video file
@@ -453,7 +453,7 @@ def run_obstacle_course_tracker(video_source=1):
 
 if __name__ == "__main__":
     # Run with webcam
-    run_obstacle_course_tracker(video_source=0)
+    run_obstacle_course_tracker(video_source=2)
     
     # Or run with video file:
     # run_obstacle_course_tracker(video_source='obstacle_course.mp4')
