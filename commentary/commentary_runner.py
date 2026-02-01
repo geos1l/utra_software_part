@@ -79,7 +79,9 @@ class CommentaryRunner:
                 self._in_flight = False
             return False
         any_match_ended = any(p.get("match_ended") for p in payloads)
-        text = self.commentary_ai.generate_commentary(payloads)
+        # Coalesce: send only the latest state so rapid events (e.g. 5 touches) get one comment
+        payload_to_send = payloads[-1]
+        text = self.commentary_ai.generate_commentary(payload_to_send)
         self._last_commentary_time = time.time()
         if text:
             while self.tts.is_playing():
