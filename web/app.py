@@ -1,6 +1,5 @@
-"""FastAPI app: state API, stream+HUD, timer key listener (backend starts timer on key press)."""
+"""FastAPI app: state API, stream+HUD. Timer is controlled by webpage buttons only."""
 import sys
-import time
 import threading
 import cv2
 from pathlib import Path
@@ -21,67 +20,27 @@ from db import mongodb as db_mongodb
 # Commentary runner: set in lifespan if Gemini + ElevenLabs keys present
 commentary_runner = None
 
-try:
-    import keyboard
-    HAS_KEYBOARD = True
-except ImportError:
-    HAS_KEYBOARD = False
-
 
 def build_commentary_payload() -> dict:
-    """Build one Gemini-shaped payload from current match state (team_id, score_total, t_elapsed_s, score_breakdown, obstacle_touches, match_ended, notable_event)."""
+    """Build one Gemini-shaped payload from current match state (team_id, score_total, t_elapsed_s, score_breakdown, box_drop_1, box_drop_2, obstacle_touches, match_ended, notable_event)."""
     state = match_state.get_state()
     return {
         "team_id": state.get("team_number", ""),
         "score_total": state.get("score_total", 0),
         "t_elapsed_s": state.get("t_elapsed_s", 0),
         "score_breakdown": state.get("score_breakdown", {}),
+        "box_drop_1": state.get("box_drop_1"),
+        "box_drop_2": state.get("box_drop_2"),
         "obstacle_touches": state.get("obstacle_touches", 0),
         "match_ended": state.get("match_ended", False),
         "notable_event": True,
     }
 
 
-def _timer_key_listener():
-    """Backend: TIMER_START_KEY starts match, TIMER_STOP_KEY ends match (debounced)."""
-    if not HAS_KEYBOARD:
-        return
-    start_key = Settings.TIMER_START_KEY
-    stop_key = Settings.TIMER_STOP_KEY
-    started_pressed = False
-    stopped_pressed = False
-    while True:
-        try:
-            if keyboard.is_pressed(start_key):
-                if not started_pressed:
-                    match_state.set_timer_started()
-                    started_pressed = True
-                    if commentary_runner is not None:
-                        commentary_runner.play_intro()
-                    print("[Timer] Started (key press).")
-                time.sleep(0.5)
-            else:
-                started_pressed = False
-            if keyboard.is_pressed(stop_key):
-                if not stopped_pressed:
-                    match_state.set_timer_stopped()
-                    stopped_pressed = True
-                    print("[Timer] Ended (key press).")
-                time.sleep(0.5)
-            else:
-                stopped_pressed = False
-        except Exception:
-            pass
-        time.sleep(0.05)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global commentary_runner
     match_state.set_team_number(Settings.TEAM_NUMBER)
-    if HAS_KEYBOARD:
-        t = threading.Thread(target=_timer_key_listener, daemon=True)
-        t.start()
     # Start commentary runner if Gemini + ElevenLabs keys are set
     if Settings.GEMINI_API_KEY and Settings.ELEVENLABS_API_KEY:
         try:
@@ -111,12 +70,6 @@ async def lifespan(app: FastAPI):
         else:
             print(f"[MongoDB] Not connected: {err}; Save run and leaderboard will fail for DB.")
     yield
-    # Unhook keyboard on shutdown so the process and terminal exit cleanly
-    if HAS_KEYBOARD:
-        try:
-            keyboard.unhook_all()
-        except Exception:
-            pass
 
 
 app = FastAPI(title="UTRA Match Overlay", lifespan=lifespan)
@@ -201,7 +154,9 @@ def get_leaderboard():
 class SetBreakdownBody(BaseModel):
     obstacle_touches: int | None = None
     completed_under_60: bool | None = None
-    box_drop: str | None = None  # "fully_in" | "partially_touching" | "mostly_out"
+    box_drop: str | None = None  # legacy single drop
+    box_drop_1: str | None = None  # "fully_in" | "edge_touching" | "less_than_half_out" | "mostly_out"
+    box_drop_2: str | None = None
 
 
 @app.post("/api/test/set_breakdown")
@@ -209,7 +164,8 @@ def set_breakdown(body: SetBreakdownBody):
     match_state.set_breakdown(
         obstacle_touches=body.obstacle_touches,
         completed_under_60=body.completed_under_60,
-        box_drop=body.box_drop,
+        box_drop_1=body.box_drop_1 if body.box_drop_1 is not None else body.box_drop,
+        box_drop_2=body.box_drop_2,
     )
     return match_state.get_state()
 
@@ -224,7 +180,8 @@ def _leaderboard_doc_from_state():
         "t_elapsed_s": s["t_elapsed_s"],
         "obstacle_touches": s["obstacle_touches"],
         "completed_under_60": s["completed_under_60"],
-        "box_drop": s["box_drop"],
+        "box_drop_1": s.get("box_drop_1"),
+        "box_drop_2": s.get("box_drop_2"),
         "score_breakdown": s["score_breakdown"],
     }
 

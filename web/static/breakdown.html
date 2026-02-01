@@ -29,7 +29,9 @@
         <tbody>
           <tr><td>Obstacles (5 − touches)</td><td style="text-align:right;" id="bd-obstacles">0</td></tr>
           <tr><td>Completed under 60s</td><td style="text-align:right;" id="bd-under60">0</td></tr>
-          <tr><td>Box drop</td><td style="text-align:right;" id="bd-box">0</td></tr>
+          <tr><td>Box drop 1</td><td style="text-align:right;" id="bd-box1">—</td></tr>
+          <tr><td>Box drop 2</td><td style="text-align:right;" id="bd-box2">—</td></tr>
+          <tr><td>Box drops total</td><td style="text-align:right;" id="bd-box">0</td></tr>
           <tr class="total-row"><td>Total</td><td style="text-align:right;" id="bd-total">0</td></tr>
         </tbody>
       </table>
@@ -45,6 +47,8 @@
         const bd = state.score_breakdown || {};
         document.getElementById('bd-obstacles').textContent = bd.obstacles ?? 0;
         document.getElementById('bd-under60').textContent = bd.completed_under_60 ?? 0;
+        document.getElementById('bd-box1').textContent = state.box_drop_1 || '—';
+        document.getElementById('bd-box2').textContent = state.box_drop_2 || '—';
         document.getElementById('bd-box').textContent = bd.box_drop ?? 0;
         document.getElementById('bd-total').textContent = state.score_total ?? 0;
       } catch (e) {}

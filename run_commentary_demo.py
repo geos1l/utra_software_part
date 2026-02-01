@@ -55,12 +55,14 @@ def main():
             "score_breakdown": {"obstacles": 5, "completed_under_60": 0, "box_drop": 0},
             "notable_event": True,
         },
-        # DEMO: Box drop fully in (+5)
+        # DEMO: Box drop 1 fully in (+5)
         {
             "team_id": "TEAM_01",
             "score_total": 10,
             "t_elapsed_s": 28.0,
             "score_breakdown": {"obstacles": 5, "completed_under_60": 0, "box_drop": 5},
+            "box_drop_1": "fully_in",
+            "box_drop_2": None,
             "notable_event": True,
         },
         # DEMO: One obstacle touch (obstacle 4, total 9)
@@ -71,12 +73,14 @@ def main():
             "score_breakdown": {"obstacles": 4, "completed_under_60": 0, "box_drop": 5},
             "notable_event": True,
         },
-        # DEMO: Box adjusted to partially touching (box 4, total 12)
+        # DEMO: Box drop 2 edge touching (box 4 pts, total 12)
         {
             "team_id": "TEAM_01",
             "score_total": 12,
             "t_elapsed_s": 48.0,
             "score_breakdown": {"obstacles": 4, "completed_under_60": 0, "box_drop": 4},
+            "box_drop_1": "fully_in",
+            "box_drop_2": "edge_touching",
             "notable_event": True,
         },
         # DEMO: Finish under 60s (+5 time bonus, total 17)

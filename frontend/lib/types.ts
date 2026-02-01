@@ -4,6 +4,9 @@ export interface ScoreBreakdown {
   boxDrop: number;
 }
 
+/** Box drop rating: 5=fully in, 4=edge touching, 2=less than half out, 1=mostly out */
+export type BoxDropRating = "none" | "fullyIn" | "edgeTouching" | "lessThanHalfOut" | "mostlyOut";
+
 export interface MatchState {
   teamNumber: string;
   score: number;
@@ -11,8 +14,10 @@ export interface MatchState {
   isRunning: boolean;
   obstacleTouches: number;
   completedUnder60: boolean;
-  boxDrop: "none" | "fullyIn" | "partial" | "mostlyOut";
-  /** Points from backend (obstacles = 5-touches, under60 = 5, box_drop = 5/4/1) */
+  /** Up to two box drops; each rated 5/4/2/1 per rubric */
+  boxDrop1: BoxDropRating;
+  boxDrop2: BoxDropRating;
+  /** Points from backend (obstacles, under60, box_drop total) */
   scoreBreakdown?: ScoreBreakdown;
 }
 
@@ -23,7 +28,10 @@ export interface LeaderboardEntry {
   time: string;
   obstacleTouches: number;
   completedUnder60: boolean;
-  boxDrop: "none" | "fullyIn" | "partial" | "mostlyOut";
+  boxDrop1: BoxDropRating;
+  boxDrop2: BoxDropRating;
+  /** Sum of box drop 1 + 2 points (5/4/2/1 each) */
+  boxDropTotal: number;
 }
 
 export const COLORS = {

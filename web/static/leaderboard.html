@@ -27,7 +27,9 @@
             <th style="text-align:right;">Time</th>
             <th>Obstacles</th>
             <th>Under 60s</th>
-            <th>Box drop</th>
+            <th>Box 1</th>
+            <th>Box 2</th>
+            <th>Box total</th>
           </tr>
         </thead>
         <tbody id="leaderboard-body"></tbody>
@@ -42,6 +44,14 @@
       const s = Math.floor(sec % 60);
       return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
     }
+    function boxDropPts(v) {
+      if (!v) return 0;
+      if (v === 'fully_in') return 5;
+      if (v === 'edge_touching' || v === 'partially_touching') return 4;
+      if (v === 'less_than_half_out') return 2;
+      if (v === 'mostly_out') return 1;
+      return 0;
+    }
 
     async function pollLeaderboard() {
       try {
@@ -51,12 +61,12 @@
         const emptyMsg = document.getElementById('empty-msg');
         if (!list || list.length === 0) {
           emptyMsg.style.display = 'block';
-          tbody.innerHTML = '<tr><td>—</td><td>—</td><td style="text-align:right;">0</td><td style="text-align:right;">0:00</td><td>0</td><td>—</td><td>—</td></tr>';
+          tbody.innerHTML = '<tr><td>—</td><td>—</td><td style="text-align:right;">0</td><td style="text-align:right;">0:00</td><td>0</td><td>—</td><td>—</td><td>—</td></tr>';
           return;
         }
         emptyMsg.style.display = 'none';
         tbody.innerHTML = list.map((row, i) =>
-          '<tr><td>' + (row.team_display || row.team_number) + '</td><td style="text-align:right;">' + row.score_total + '</td><td style="text-align:right;">' + formatTime(row.t_elapsed_s || 0) + '</td><td>' + (row.obstacle_touches ?? 0) + '</td><td>' + (row.completed_under_60 ? '✓' : '—') + '</td><td>' + (row.box_drop || '—') + '</td></tr>'
+          '<tr><td>' + (row.team_display || row.team_number) + '</td><td style="text-align:right;">' + row.score_total + '</td><td style="text-align:right;">' + formatTime(row.t_elapsed_s || 0) + '</td><td>' + (row.obstacle_touches ?? 0) + '</td><td>' + (row.completed_under_60 ? '✓' : '—') + '</td><td>' + (boxDropPts(row.box_drop_1) || '—') + '</td><td>' + (boxDropPts(row.box_drop_2) || '—') + '</td><td>' + ((row.score_breakdown && row.score_breakdown.box_drop !== undefined) ? row.score_breakdown.box_drop : '—') + '</td></tr>'
         ).join('');
       } catch (e) {}
     }

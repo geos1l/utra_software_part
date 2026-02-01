@@ -1,10 +1,17 @@
-"""In-memory match state: timer, team number, score breakdown (obstacles, completed_under_60, box_drop)."""
+"""In-memory match state: timer, team number, score breakdown (obstacles, completed_under_60, box_drops)."""
 import time
 import threading
 from typing import Any
 
-# Box drop points: fully_in=5, partially_touching=4, mostly_out=1, None=0
-BOX_DROP_POINTS = {"fully_in": 5, "partially_touching": 4, "mostly_out": 1}
+# Box drop rubric: up to two drops per match, each rated 5/4/2/1
+# 5=fully in area, 4=part touching edge but not outside, 2=less than half outside, 1=most outside
+BOX_DROP_POINTS = {
+    "fully_in": 5,
+    "edge_touching": 4,        # part touching edge but not outside area
+    "partially_touching": 4,   # alias for edge_touching
+    "less_than_half_out": 2,   # less than half the box outside area
+    "mostly_out": 1,           # most of box outside area
+}
 
 
 class MatchState:
@@ -18,7 +25,8 @@ class MatchState:
         self.team_number: str = "1"
         self.obstacle_touches: int = 0
         self.completed_under_60: bool = False
-        self.box_drop: str | None = None  # "fully_in" | "partially_touching" | "mostly_out" | None
+        self.box_drop_1: str | None = None  # first drop: fully_in | edge_touching | less_than_half_out | mostly_out | None
+        self.box_drop_2: str | None = None  # second drop (optional)
         self._leaderboard: list[dict[str, Any]] = []
 
     def set_timer_started(self) -> None:
@@ -36,11 +44,15 @@ class MatchState:
             self.match_ended = True
 
     def reset_for_new_match(self) -> None:
-        """Clear frozen time and match_ended so next Start match runs from 0."""
+        """Clear timer and scoring state so the next Start match runs from 0 with no carryover."""
         with self._lock:
             self.timer_started_at = None
             self.timer_stopped_at_elapsed_s = None
             self.match_ended = False
+            self.obstacle_touches = 0
+            self.completed_under_60 = False
+            self.box_drop_1 = None
+            self.box_drop_2 = None
 
     def set_team_number(self, team_number: str | int) -> None:
         with self._lock:
@@ -50,15 +62,18 @@ class MatchState:
         self,
         obstacle_touches: int | None = None,
         completed_under_60: bool | None = None,
-        box_drop: str | None = None,
+        box_drop_1: str | None = None,
+        box_drop_2: str | None = None,
     ) -> None:
         with self._lock:
             if obstacle_touches is not None:
                 self.obstacle_touches = max(0, obstacle_touches)
             if completed_under_60 is not None:
                 self.completed_under_60 = completed_under_60
-            if box_drop is not None:
-                self.box_drop = box_drop if box_drop in BOX_DROP_POINTS else None
+            if box_drop_1 is not None:
+                self.box_drop_1 = box_drop_1 if box_drop_1 in BOX_DROP_POINTS else None
+            if box_drop_2 is not None:
+                self.box_drop_2 = box_drop_2 if box_drop_2 in BOX_DROP_POINTS else None
 
     def get_elapsed_s(self) -> float:
         with self._lock:
@@ -83,8 +98,11 @@ class MatchState:
             return 5 if (self.match_ended and self.completed_under_60) else 0
 
     def compute_box_drop_points(self) -> int:
+        """Sum points for up to two box drops (each 5/4/2/1 per rubric)."""
         with self._lock:
-            return BOX_DROP_POINTS.get(self.box_drop or "", 0)
+            p1 = BOX_DROP_POINTS.get(self.box_drop_1 or "", 0)
+            p2 = BOX_DROP_POINTS.get(self.box_drop_2 or "", 0)
+            return p1 + p2
 
     def compute_score_total(self) -> int:
         return (
@@ -116,7 +134,8 @@ class MatchState:
                 "score_breakdown": breakdown,
                 "obstacle_touches": self.obstacle_touches,
                 "completed_under_60": self.completed_under_60,
-                "box_drop": self.box_drop,
+                "box_drop_1": self.box_drop_1,
+                "box_drop_2": self.box_drop_2,
             }
 
     def save_run_to_leaderboard(self) -> dict[str, Any]:
@@ -129,7 +148,8 @@ class MatchState:
             "t_elapsed_s": round(self.get_elapsed_s(), 2),
             "obstacle_touches": self.obstacle_touches,
             "completed_under_60": self.completed_under_60,
-            "box_drop": self.box_drop,
+            "box_drop_1": self.box_drop_1,
+            "box_drop_2": self.box_drop_2,
         }
         with self._lock:
             self._leaderboard.append(entry)

@@ -32,8 +32,17 @@ const initialMatchState: MatchState = {
   isRunning: false,
   obstacleTouches: 0,
   completedUnder60: false,
-  boxDrop: "none",
+  boxDrop1: "none",
+  boxDrop2: "none",
 };
+
+function boxDropLabel(r: MatchState["boxDrop1"]): string {
+  if (r === "fullyIn") return "FULLY IN";
+  if (r === "edgeTouching") return "EDGE";
+  if (r === "lessThanHalfOut") return "<½ OUT";
+  if (r === "mostlyOut") return "MOSTLY OUT";
+  return "NONE";
+}
 
 export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchViewProps) {
   const [state, setState] = useState<MatchState>(initialMatchState);
@@ -103,8 +112,8 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
     await apiCommentaryPush();
   };
 
-  const handleBoxDrop = async (value: "fully_in" | "partially_touching" | "mostly_out" | null) => {
-    const next = await apiSetBreakdown({ box_drop: value });
+  const handleBoxDrop = async (slot: 1 | 2, value: "fully_in" | "edge_touching" | "less_than_half_out" | "mostly_out" | null) => {
+    const next = await apiSetBreakdown(slot === 1 ? { box_drop_1: value } : { box_drop_2: value });
     if (next) setState(next);
     await apiCommentaryPush();
   };
@@ -129,7 +138,6 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>UTRA MATCH</Text>
-        <Text style={styles.headerSubtitle}>Round 1 - Match 1</Text>
       </View>
 
       {/* Main Content - centered score/timer block */}
@@ -194,10 +202,12 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
           </Text>
         </View>
         <View style={[styles.tableRow, styles.tableRowLight]}>
-          <Text style={styles.tableCellLabel}>Box Drop</Text>
-          <Text style={styles.tableCellValue}>
-            {state.boxDrop === "fullyIn" ? "FULLY IN" : state.boxDrop === "partial" ? "PARTIAL" : state.boxDrop === "mostlyOut" ? "MOSTLY OUT" : "NONE"}
-          </Text>
+          <Text style={styles.tableCellLabel}>Box drop 1</Text>
+          <Text style={styles.tableCellValue}>{boxDropLabel(state.boxDrop1)}</Text>
+        </View>
+        <View style={[styles.tableRow, styles.tableRowDark]}>
+          <Text style={styles.tableCellLabel}>Box drop 2</Text>
+          <Text style={styles.tableCellValue}>{boxDropLabel(state.boxDrop2)}</Text>
         </View>
       </View>
 
@@ -217,29 +227,71 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
               <TouchableOpacity style={styles.simulateButton} onPress={handleObstacleTouch}>
                 <Text style={styles.simulateButtonText}>+ Obstacle</Text>
               </TouchableOpacity>
+            </View>
+            <View style={styles.simulateRow}>
+              <Text style={styles.simulateLabel}>Box drop 1:</Text>
               <TouchableOpacity
-                style={[styles.simulateButtonSmall, state.boxDrop === "none" && styles.simulateButtonActive]}
-                onPress={() => handleBoxDrop(null)}
+                style={[styles.simulateButtonSmall, state.boxDrop1 === "none" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop(1, null)}
               >
                 <Text style={styles.simulateButtonText}>None</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.simulateButtonSmall, state.boxDrop === "fullyIn" && styles.simulateButtonActive]}
-                onPress={() => handleBoxDrop("fully_in")}
+                style={[styles.simulateButtonSmall, state.boxDrop1 === "fullyIn" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop(1, "fully_in")}
               >
-                <Text style={styles.simulateButtonText}>Fully in</Text>
+                <Text style={styles.simulateButtonText}>Fully in (5)</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.simulateButtonSmall, state.boxDrop === "partial" && styles.simulateButtonActive]}
-                onPress={() => handleBoxDrop("partially_touching")}
+                style={[styles.simulateButtonSmall, state.boxDrop1 === "edgeTouching" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop(1, "edge_touching")}
               >
-                <Text style={styles.simulateButtonText}>Partial</Text>
+                <Text style={styles.simulateButtonText}>Edge (4)</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.simulateButtonSmall, state.boxDrop === "mostlyOut" && styles.simulateButtonActive]}
-                onPress={() => handleBoxDrop("mostly_out")}
+                style={[styles.simulateButtonSmall, state.boxDrop1 === "lessThanHalfOut" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop(1, "less_than_half_out")}
               >
-                <Text style={styles.simulateButtonText}>Mostly out</Text>
+                <Text style={styles.simulateButtonText}>&lt;½ out (2)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.simulateButtonSmall, state.boxDrop1 === "mostlyOut" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop(1, "mostly_out")}
+              >
+                <Text style={styles.simulateButtonText}>Mostly out (1)</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.simulateRow}>
+              <Text style={styles.simulateLabel}>Box drop 2:</Text>
+              <TouchableOpacity
+                style={[styles.simulateButtonSmall, state.boxDrop2 === "none" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop(2, null)}
+              >
+                <Text style={styles.simulateButtonText}>None</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.simulateButtonSmall, state.boxDrop2 === "fullyIn" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop(2, "fully_in")}
+              >
+                <Text style={styles.simulateButtonText}>Fully in (5)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.simulateButtonSmall, state.boxDrop2 === "edgeTouching" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop(2, "edge_touching")}
+              >
+                <Text style={styles.simulateButtonText}>Edge (4)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.simulateButtonSmall, state.boxDrop2 === "lessThanHalfOut" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop(2, "less_than_half_out")}
+              >
+                <Text style={styles.simulateButtonText}>&lt;½ out (2)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.simulateButtonSmall, state.boxDrop2 === "mostlyOut" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop(2, "mostly_out")}
+              >
+                <Text style={styles.simulateButtonText}>Mostly out (1)</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.simulateRow}>
@@ -278,7 +330,7 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Match Results Powered By UTRA</Text>
+        <Text style={styles.footerText}>UTRA Hacks · Live overlay by OpenCV</Text>
       </View>
     </View>
   );
@@ -478,6 +530,13 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 14,
     fontWeight: "bold",
+  },
+  simulateLabel: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: "600",
+    alignSelf: "center",
+    marginRight: 4,
   },
   simulateChevron: {
     color: COLORS.white,

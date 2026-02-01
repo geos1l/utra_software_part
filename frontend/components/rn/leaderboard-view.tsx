@@ -8,8 +8,16 @@ import {
   Dimensions,
 } from "react-native";
 import { useState, useEffect, useCallback } from "react";
-import { COLORS, type LeaderboardEntry } from "@/lib/types";
+import { COLORS, type LeaderboardEntry, type BoxDropRating } from "@/lib/types";
 import { fetchLeaderboard, LEADERBOARD_SAVED_EVENT } from "@/lib/api";
+
+function boxDropPoints(r: BoxDropRating): number {
+  if (r === "fullyIn") return 5;
+  if (r === "edgeTouching") return 4;
+  if (r === "lessThanHalfOut") return 2;
+  if (r === "mostlyOut") return 1;
+  return 0;
+}
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -62,23 +70,6 @@ export function LeaderboardView({ backgroundNumber = "1" }: LeaderboardViewProps
 
       {/* Main Content */}
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* High Score Banner */}
-        {entries.length > 0 && (
-          <View style={styles.highScoreBanner}>
-            <Text style={styles.highScoreStar}>★</Text>
-            <View style={styles.highScoreContent}>
-              <Text style={styles.highScoreLabel}>HIGH SCORE</Text>
-              <View style={styles.highScoreTeamRow}>
-                <View style={styles.highScoreTeamBox}>
-                  <Text style={styles.highScoreTeamNumber}>{entries[0].team}</Text>
-                </View>
-                <Text style={styles.highScoreValue}>{entries[0].score}</Text>
-              </View>
-            </View>
-            <Text style={styles.highScoreStar}>★</Text>
-          </View>
-        )}
-
         {/* Leaderboard Table */}
         <View style={styles.tableContainer}>
           {/* Table Header: Team = team number only (no separate # column) */}
@@ -88,7 +79,9 @@ export function LeaderboardView({ backgroundNumber = "1" }: LeaderboardViewProps
             <Text style={[styles.tableHeaderCell, styles.cellTime]}>TIME</Text>
             <Text style={[styles.tableHeaderCell, styles.cellObstacle]}>OBS</Text>
             <Text style={[styles.tableHeaderCell, styles.cellBonus]}>60s</Text>
-            <Text style={[styles.tableHeaderCell, styles.cellBox]}>BOX</Text>
+            <Text style={[styles.tableHeaderCell, styles.cellBox1]}>BOX 1</Text>
+            <Text style={[styles.tableHeaderCell, styles.cellBox2]}>BOX 2</Text>
+            <Text style={[styles.tableHeaderCell, styles.cellBoxTotal]}>BOX TOT</Text>
           </View>
 
           {/* Table Rows: placeholder with 0/— when empty, else real entries */}
@@ -99,7 +92,9 @@ export function LeaderboardView({ backgroundNumber = "1" }: LeaderboardViewProps
             time: "0:00",
             obstacleTouches: 0,
             completedUnder60: false,
-            boxDrop: "none" as const,
+            boxDrop1: "none" as const,
+            boxDrop2: "none" as const,
+            boxDropTotal: 0,
           }] : entries).map((entry, index) => (
             <View
               key={entries.length === 0 ? "placeholder" : `${entry.team}-${index}`}
@@ -121,8 +116,14 @@ export function LeaderboardView({ backgroundNumber = "1" }: LeaderboardViewProps
               <Text style={[styles.tableCell, styles.cellBonus]}>
                 {entry.completedUnder60 ? "✓" : "-"}
               </Text>
-              <Text style={[styles.tableCell, styles.cellBox]}>
-                {entry.boxDrop === "none" ? "-" : entry.boxDrop.charAt(0).toUpperCase()}
+              <Text style={[styles.tableCell, styles.cellBox1]}>
+                {boxDropPoints(entry.boxDrop1) > 0 ? boxDropPoints(entry.boxDrop1) : "—"}
+              </Text>
+              <Text style={[styles.tableCell, styles.cellBox2]}>
+                {boxDropPoints(entry.boxDrop2) > 0 ? boxDropPoints(entry.boxDrop2) : "—"}
+              </Text>
+              <Text style={[styles.tableCell, styles.cellBoxTotal]}>
+                {entry.boxDropTotal > 0 ? entry.boxDropTotal : "—"}
               </Text>
             </View>
           ))}
@@ -131,7 +132,7 @@ export function LeaderboardView({ backgroundNumber = "1" }: LeaderboardViewProps
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Match Results Powered By UTRA</Text>
+        <Text style={styles.footerText}>UTRA Hacks · Live overlay by OpenCV</Text>
       </View>
     </View>
   );
@@ -184,54 +185,12 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   scrollContent: {
+    flexGrow: 1,
     padding: 20,
-  },
-  highScoreBanner: {
-    backgroundColor: COLORS.yellow,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 4,
-    marginBottom: 20,
-  },
-  highScoreStar: {
-    fontSize: 32,
-    color: COLORS.darkText,
-  },
-  highScoreContent: {
-    alignItems: "center",
-    marginHorizontal: 20,
-  },
-  highScoreLabel: {
-    color: COLORS.darkText,
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
-  highScoreTeamRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  highScoreTeamBox: {
-    backgroundColor: "#EF4444",
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 4,
-  },
-  highScoreTeamNumber: {
-    color: COLORS.white,
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  highScoreValue: {
-    color: COLORS.darkText,
-    fontSize: 36,
-    fontWeight: "900",
+    paddingTop: 24,
   },
   tableContainer: {
+    flex: 1,
     backgroundColor: COLORS.white,
     borderRadius: 4,
     overflow: "hidden",
@@ -281,8 +240,14 @@ const styles = StyleSheet.create({
   cellBonus: {
     width: 50,
   },
-  cellBox: {
-    width: 50,
+  cellBox1: {
+    width: 48,
+  },
+  cellBox2: {
+    width: 48,
+  },
+  cellBoxTotal: {
+    width: 52,
   },
   scoreText: {
     fontSize: 20,

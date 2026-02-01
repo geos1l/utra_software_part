@@ -1,10 +1,10 @@
 /**
  * API client: maps backend (FastAPI) response to frontend types.
- * Backend: snake_case, team_number, t_elapsed_s, score_breakdown, box_drop "fully_in"|"partially_touching"|"mostly_out"|null
- * Frontend: camelCase, teamNumber, timerSeconds, boxDrop "none"|"fullyIn"|"partial"|"mostlyOut"
+ * Backend: snake_case, box_drop_1, box_drop_2 (fully_in|edge_touching|less_than_half_out|mostly_out)
+ * Frontend: camelCase, boxDrop1, boxDrop2 (fullyIn|edgeTouching|lessThanHalfOut|mostlyOut|none)
  */
 
-import type { MatchState, LeaderboardEntry } from "./types";
+import type { MatchState, LeaderboardEntry, BoxDropRating } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -19,12 +19,14 @@ export interface BackendState {
   score_breakdown?: { obstacles?: number; completed_under_60?: number; box_drop?: number };
   obstacle_touches?: number;
   completed_under_60?: boolean;
-  box_drop?: string | null;
+  box_drop_1?: string | null;
+  box_drop_2?: string | null;
 }
 
-function mapBoxDropBackendToFrontend(value: string | null | undefined): "none" | "fullyIn" | "partial" | "mostlyOut" {
+function mapBoxDropBackendToFrontend(value: string | null | undefined): BoxDropRating {
   if (value === "fully_in") return "fullyIn";
-  if (value === "partially_touching") return "partial";
+  if (value === "edge_touching" || value === "partially_touching") return "edgeTouching";
+  if (value === "less_than_half_out") return "lessThanHalfOut";
   if (value === "mostly_out") return "mostlyOut";
   return "none";
 }
@@ -38,7 +40,8 @@ export function mapBackendStateToMatchState(data: BackendState): MatchState {
     isRunning: data.timer_running ?? false,
     obstacleTouches: data.obstacle_touches ?? 0,
     completedUnder60: data.completed_under_60 ?? false,
-    boxDrop: mapBoxDropBackendToFrontend(data.box_drop),
+    boxDrop1: mapBoxDropBackendToFrontend(data.box_drop_1),
+    boxDrop2: mapBoxDropBackendToFrontend(data.box_drop_2),
     scoreBreakdown: bd
       ? {
           obstacles: bd.obstacles ?? 0,
@@ -49,10 +52,11 @@ export function mapBackendStateToMatchState(data: BackendState): MatchState {
   };
 }
 
-export function mapBoxDropFrontendToBackend(value: "none" | "fullyIn" | "partial" | "mostlyOut"): string | null {
+export function mapBoxDropFrontendToBackend(value: BoxDropRating): string | null {
   if (value === "none") return null;
   if (value === "fullyIn") return "fully_in";
-  if (value === "partial") return "partially_touching";
+  if (value === "edgeTouching") return "edge_touching";
+  if (value === "lessThanHalfOut") return "less_than_half_out";
   if (value === "mostlyOut") return "mostly_out";
   return null;
 }
@@ -80,7 +84,8 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
       score_breakdown?: { obstacles?: number; completed_under_60?: number; box_drop?: number };
       obstacle_touches?: number;
       completed_under_60?: boolean;
-      box_drop?: string | null;
+      box_drop_1?: string | null;
+      box_drop_2?: string | null;
     }> = await res.json();
     return data.map((row, i) => ({
       rank: i + 1,
@@ -89,7 +94,9 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
       time: formatTime(row.t_elapsed_s ?? 0),
       obstacleTouches: row.obstacle_touches ?? 0,
       completedUnder60: row.completed_under_60 ?? false,
-      boxDrop: mapBoxDropBackendToFrontend(row.box_drop),
+      boxDrop1: mapBoxDropBackendToFrontend(row.box_drop_1),
+      boxDrop2: mapBoxDropBackendToFrontend(row.box_drop_2),
+      boxDropTotal: row.score_breakdown?.box_drop ?? 0,
     }));
   } catch {
     return [];
@@ -153,7 +160,8 @@ export async function apiSetTeam(team: string): Promise<MatchState | null> {
 export async function apiSetBreakdown(payload: {
   obstacle_touches?: number;
   completed_under_60?: boolean;
-  box_drop?: string | null;
+  box_drop_1?: string | null;
+  box_drop_2?: string | null;
 }): Promise<MatchState | null> {
   try {
     const res = await fetch(`${API_BASE}/api/test/set_breakdown`, {
@@ -179,7 +187,7 @@ export async function apiSaveRun(): Promise<LeaderboardEntry[] | null> {
     const data = await res.json();
     const list = Array.isArray(data.leaderboard) ? data.leaderboard : [];
     const entries: LeaderboardEntry[] = list.map(
-      (row: { team_display?: string; team_number?: string; score_total?: number; t_elapsed_s?: number; obstacle_touches?: number; completed_under_60?: boolean; box_drop?: string | null },
+      (row: { team_display?: string; team_number?: string; score_total?: number; t_elapsed_s?: number; obstacle_touches?: number; completed_under_60?: boolean; box_drop_1?: string | null; box_drop_2?: string | null; score_breakdown?: { box_drop?: number } },
        i: number) => ({
         rank: i + 1,
         team: row.team_display ?? row.team_number ?? "—",
@@ -187,7 +195,9 @@ export async function apiSaveRun(): Promise<LeaderboardEntry[] | null> {
         time: formatTime(row.t_elapsed_s ?? 0),
         obstacleTouches: row.obstacle_touches ?? 0,
         completedUnder60: row.completed_under_60 ?? false,
-        boxDrop: mapBoxDropBackendToFrontend(row.box_drop),
+        boxDrop1: mapBoxDropBackendToFrontend(row.box_drop_1),
+        boxDrop2: mapBoxDropBackendToFrontend(row.box_drop_2),
+        boxDropTotal: row.score_breakdown?.box_drop ?? 0,
       })
     );
     if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(LEADERBOARD_SAVED_EVENT, { detail: entries }));

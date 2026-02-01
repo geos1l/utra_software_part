@@ -24,7 +24,8 @@ export function ScoreBreakdownView({ backgroundNumber = "8" }: ScoreBreakdownVie
     isRunning: false,
     obstacleTouches: 9,
     completedUnder60: true,
-    boxDrop: "none",
+    boxDrop1: "none",
+    boxDrop2: "none",
   });
 
   useEffect(() => {
@@ -37,12 +38,14 @@ export function ScoreBreakdownView({ backgroundNumber = "8" }: ScoreBreakdownVie
     return () => clearInterval(interval);
   }, []);
 
-  // Use backend score breakdown when available (5-touches, under60=5, box_drop=5/4/1)
+  // Use backend score breakdown (obstacles, under60=5, box_drop = sum of up to 2 drops: 5/4/2/1 each)
   const bd = state.scoreBreakdown;
   const obstaclePoints = bd?.obstacles ?? 0;
   const under60Points = bd?.completedUnder60 ?? (state.completedUnder60 ? 5 : 0);
   const boxDropPoints = bd?.boxDrop ?? 0;
   const totalScore = state.score;
+  const boxDropLabel = (r: MatchState["boxDrop1"]) =>
+    r === "fullyIn" ? "Fully in" : r === "edgeTouching" ? "Edge" : r === "lessThanHalfOut" ? "<½ out" : r === "mostlyOut" ? "Mostly out" : "None";
 
   return (
     <View style={styles.container}>
@@ -88,9 +91,17 @@ export function ScoreBreakdownView({ backgroundNumber = "8" }: ScoreBreakdownVie
             <Text style={styles.tableCellValue}>{under60Points}</Text>
           </View>
 
-          {/* Box Drop (5/4/1) */}
+          {/* Box drops (up to 2; each 5/4/2/1) */}
           <View style={[styles.tableRow, styles.tableRowLight]}>
-            <Text style={styles.tableCellLabel}>BOX DROP ({state.boxDrop === "fullyIn" ? "FULLY IN" : state.boxDrop === "partial" ? "PARTIAL" : state.boxDrop === "mostlyOut" ? "MOSTLY OUT" : "NONE"})</Text>
+            <Text style={styles.tableCellLabel}>BOX DROP 1 ({boxDropLabel(state.boxDrop1).toUpperCase()})</Text>
+            <Text style={styles.tableCellValue}>{state.boxDrop1 === "none" ? "0" : state.boxDrop1 === "fullyIn" ? "5" : state.boxDrop1 === "edgeTouching" ? "4" : state.boxDrop1 === "lessThanHalfOut" ? "2" : "1"}</Text>
+          </View>
+          <View style={[styles.tableRow, styles.tableRowDark]}>
+            <Text style={styles.tableCellLabel}>BOX DROP 2 ({boxDropLabel(state.boxDrop2).toUpperCase()})</Text>
+            <Text style={styles.tableCellValue}>{state.boxDrop2 === "none" ? "0" : state.boxDrop2 === "fullyIn" ? "5" : state.boxDrop2 === "edgeTouching" ? "4" : state.boxDrop2 === "lessThanHalfOut" ? "2" : "1"}</Text>
+          </View>
+          <View style={[styles.tableRow, styles.tableRowLight]}>
+            <Text style={styles.tableCellLabel}>BOX DROPS TOTAL</Text>
             <Text style={styles.tableCellValue}>{boxDropPoints}</Text>
           </View>
 
@@ -112,7 +123,7 @@ export function ScoreBreakdownView({ backgroundNumber = "8" }: ScoreBreakdownVie
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Match Results Powered By UTRA</Text>
+        <Text style={styles.footerText}>UTRA Hacks · Live overlay by OpenCV</Text>
       </View>
     </View>
   );

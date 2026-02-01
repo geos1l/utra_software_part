@@ -73,7 +73,7 @@ def get_leaderboard(limit: int = 100) -> list[dict[str, Any]]:
         cursor = coll.find(
             {},
             {"_id": 0, "created_at": 1, "team_number": 1, "team_display": 1, "score_total": 1,
-             "t_elapsed_s": 1, "obstacle_touches": 1, "completed_under_60": 1, "box_drop": 1,
+             "t_elapsed_s": 1, "obstacle_touches": 1, "completed_under_60": 1, "box_drop_1": 1, "box_drop_2": 1,
              "score_breakdown": 1},
         ).sort("score_total", -1).limit(limit)
         return list(cursor)
