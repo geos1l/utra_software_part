@@ -1,235 +1,230 @@
 import cv2
 import numpy as np
+import time
+
+# =======================
+# SCORER
+# =======================
+
+class SimpleScorer:
+    def __init__(self):
+        self.obstacle_hits = 0
+        self.track_segments_completed = []
+        self.start_time = None
+        self.box_score = 0
+
+    def start_run(self):
+        self.start_time = time.time()
+        self.obstacle_hits = 0
+        self.track_segments_completed = []
+        self.box_score = 0
+
+    def get_obstacle_score(self):
+        return max(0, 5 - self.obstacle_hits)
+
+    def get_total_score(self):
+        return self.box_score + self.get_obstacle_score()
 
 
-def find_white_rectangle(frame, brightness_threshold=180, min_area_pct=5, max_area_pct=60, erosion_size=5):
-    """
-    Find white stuff, erode to remove marble noise, filter by size, get the track board.
-    
-    Now returns the ACTUAL contour shape (not just bounding rectangle)
-    
-    Parameters you can adjust:
-    - brightness_threshold: how bright to be "white" (0-255)
-    - min_area_pct: minimum size as % of image (filters out small stuff)
-    - max_area_pct: maximum size as % of image (filters out entire floor)
-    - erosion_size: how much to erode (removes marble noise, keeps solid white track)
-    """
-    # Convert to grayscale
+# =======================
+# BLUE DROP ZONE
+# =======================
+
+def detect_blue_drop_zone(frame):
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # Dark blue on white
+    lower_blue = np.array([95, 50, 20])
+    upper_blue = np.array([135, 255, 255])
+
+    blue_mask = cv2.inRange(hsv, lower_blue, upper_blue)
+
+    # Thicken thin outlines
+    kernel = np.ones((7, 7), np.uint8)
+    blue_mask = cv2.dilate(blue_mask, kernel, iterations=1)
+    blue_mask = cv2.morphologyEx(blue_mask, cv2.MORPH_CLOSE, kernel, iterations=1)
+
+    contours, hierarchy = cv2.findContours(
+        blue_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    if hierarchy is None:
+        return None, None, blue_mask
+
+    outer = None
+    inner = None
+
+    for i, cnt in enumerate(contours):
+        if cv2.contourArea(cnt) < 500:
+            continue
+
+        if hierarchy[0][i][3] == -1:
+            if outer is None or cv2.contourArea(cnt) > cv2.contourArea(outer):
+                outer = cnt
+        else:
+            if inner is None or cv2.contourArea(cnt) > cv2.contourArea(inner):
+                inner = cnt
+
+    return inner, outer, blue_mask
+
+
+# =======================
+# RED TRACK + OBSTACLES
+# =======================
+
+def detect_red_track_and_obstacles(frame, exclude_blue_mask):
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # Red track
+    lower_red1 = np.array([0, 100, 100])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([160, 100, 100])
+    upper_red2 = np.array([180, 255, 255])
+
+    red_mask = cv2.bitwise_or(
+        cv2.inRange(hsv, lower_red1, upper_red1),
+        cv2.inRange(hsv, lower_red2, upper_red2)
+    )
+
+    # Fill gaps only
+    red_mask = cv2.morphologyEx(
+        red_mask, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8), iterations=1
+    )
+
+    track_contours, _ = cv2.findContours(
+        red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+    track_contours = [c for c in track_contours if cv2.contourArea(c) > 500]
+
+    # Track area for obstacle filtering
+    track_area = cv2.dilate(red_mask, np.ones((40, 40), np.uint8), iterations=1)
+
+    # Dark obstacles
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    
-    # Threshold: anything bright is white
-    _, white_mask = cv2.threshold(gray, brightness_threshold, 255, cv2.THRESH_BINARY)
-    
-    # MORPHOLOGICAL EROSION - removes marble noise, keeps solid white areas
-    kernel = np.ones((erosion_size, erosion_size), np.uint8)
-    eroded_mask = cv2.erode(white_mask, kernel, iterations=2)
-    
-    # Optional: dilate back slightly to restore size (but keep sharp edges)
-    dilated_mask = cv2.dilate(eroded_mask, kernel, iterations=1)
-    
-    # Calculate image area for filtering
-    image_area = frame.shape[0] * frame.shape[1]
-    min_area = image_area * (min_area_pct / 100)
-    max_area = image_area * (max_area_pct / 100)
-    
-    # Find all white blobs
-    contours, _ = cv2.findContours(dilated_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
+    _, dark_mask = cv2.threshold(gray, 60, 255, cv2.THRESH_BINARY_INV)
+
+    # Remove red shadows
+    red_shadow = cv2.bitwise_or(
+        cv2.inRange(hsv, (0, 30, 20), (10, 150, 60)),
+        cv2.inRange(hsv, (160, 30, 20), (180, 150, 60))
+    )
+
+    obstacle_mask = cv2.bitwise_and(dark_mask, cv2.bitwise_not(red_shadow))
+    obstacle_mask = cv2.bitwise_and(obstacle_mask, track_area)
+    obstacle_mask = cv2.bitwise_and(obstacle_mask, cv2.bitwise_not(red_mask))
+    obstacle_mask = cv2.bitwise_and(obstacle_mask, cv2.bitwise_not(exclude_blue_mask))
+
+    obstacle_mask = cv2.morphologyEx(
+        obstacle_mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8), iterations=1
+    )
+    obstacle_mask = cv2.morphologyEx(
+        obstacle_mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8), iterations=1
+    )
+
+    obstacle_contours, _ = cv2.findContours(
+        obstacle_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+    obstacle_contours = [c for c in obstacle_contours if cv2.contourArea(c) > 150]
+
+    return red_mask, track_contours, obstacle_mask, obstacle_contours
+
+
+# =======================
+# ROBOT
+# =======================
+
+def detect_robot(frame):
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    lower = np.array([40, 100, 100])
+    upper = np.array([80, 255, 255])
+
+    mask = cv2.inRange(hsv, lower, upper)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8), 1)
+
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
     if not contours:
-        return None, None, white_mask, eroded_mask, dilated_mask, []
-    
-    # Filter by size and find valid candidates
-    valid_contours = []
-    for cnt in contours:
-        area = cv2.contourArea(cnt)
-        if min_area < area < max_area:
-            valid_contours.append(cnt)
-    
-    if not valid_contours:
-        return None, None, white_mask, eroded_mask, dilated_mask, contours
-    
-    # Get biggest valid contour (the track board)
-    biggest = max(valid_contours, key=cv2.contourArea)
-    
-    # Instead of bounding rectangle, get the convex hull (follows the shape)
-    hull = cv2.convexHull(biggest)
-    
-    # Simplify the hull to get main corner points (approximate as polygon)
-    peri = cv2.arcLength(hull, True)
-    approx_polygon = None
+        return None
 
-    for eps in np.linspace(0.005, 0.05, 25):
-        approx = cv2.approxPolyDP(hull, eps * peri, True)
-        if len(approx) == 4:
-            approx_polygon = approx
-            break
+    c = max(contours, key=cv2.contourArea)
+    if cv2.contourArea(c) < 300:
+        return None
 
-    if approx_polygon is None:
-        approx_polygon = cv2.approxPolyDP(hull, 0.02 * peri, True)
+    M = cv2.moments(c)
+    if M["m00"] == 0:
+        return None
 
-    
-    return biggest, approx_polygon, white_mask, eroded_mask, dilated_mask, contours
+    return (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
 
 
-def mask_everything_outside_track(frame, track_contour):
-    """
-    Black out everything that's not inside the track contour.
-    Now works with ANY polygon shape, not just rectangles.
-    """
-    # Create black mask
-    mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    
-    # Fill the track polygon with white
-    cv2.fillPoly(mask, [track_contour.astype(np.int32)], 255)
-    
-    # Apply mask to frame
-    result = cv2.bitwise_and(frame, frame, mask=mask)
-    
-    return result, mask
+# =======================
+# HELPERS
+# =======================
+
+def check_robot_on_obstacle(robot_pos, obstacles):
+    if robot_pos is None:
+        return False
+    return any(abs(cv2.pointPolygonTest(c, robot_pos, True)) < 20 for c in obstacles)
 
 
-def main(video_source=0):
-    print("\n" + "="*50)
-    print("SIMPLE TRACK ISOLATOR WITH EROSION")
-    print("="*50)
-    print("Controls:")
-    print("  Q - Quit")
-    print("  + / - : Adjust brightness threshold")
-    print("  ] / [ : Adjust MIN area %")
-    print("  } / { : Adjust MAX area %")
-    print("  > / < : Adjust EROSION size (KEY!)")
-    print("="*50 + "\n")
-    
+def check_if_non_white_in_inner_zone(frame, inner):
+    if inner is None:
+        return 0
+
+    mask = np.zeros(frame.shape[:2], np.uint8)
+    cv2.drawContours(mask, [inner], -1, 255, -1)
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    ratio = np.sum((gray > 10) & (gray < 240) & (mask == 255)) / np.sum(mask == 255)
+
+    return 5 if ratio > 0.8 else 4 if ratio > 0.6 else 2 if ratio > 0.3 else 1 if ratio > 0.1 else 0
+
+
+# =======================
+# MAIN
+# =======================
+
+def main(video_source=0, debug=True):
     cap = cv2.VideoCapture(video_source)
-    
-    if not cap.isOpened():
-        print(f"❌ Can't open camera {video_source}")
-        print("Try changing video_source to 0, 1, or 2")
-        return
-    
-    # Adjustable parameters
-    brightness = 180
-    min_area_pct = 5
-    max_area_pct = 60
-    erosion_size = 5  # KEY PARAMETER for removing marble noise
-    
+    scorer = SimpleScorer()
+
     while True:
         ret, frame = cap.read()
         if not ret:
             break
-        
-        # Find the white track (now returns actual contour, not just rectangle)
-        track_contour, track_polygon, white_mask, eroded_mask, dilated_mask, all_contours = find_white_rectangle(
-            frame, brightness, min_area_pct, max_area_pct, erosion_size
-        )
-        
-        # Create visualization
-        frame_with_info = frame.copy()
-        
-        # Draw ALL contours in red (to see what's being detected)
-        cv2.drawContours(frame_with_info, all_contours, -1, (0, 0, 255), 2)
-        
-        if track_contour is not None:
-            # Draw the ACTUAL track shape in GREEN (follows the contour)
-            cv2.drawContours(frame_with_info, [track_contour], -1, (0, 255, 0), 4)
-            
-            # Draw the simplified polygon in CYAN (corner points)
-            cv2.polylines(frame_with_info, [track_polygon], True, (255, 255, 0), 3)
-            
-            # Draw corner points
-            for i, point in enumerate(track_polygon):
-                x, y = point[0]
-                cv2.circle(frame_with_info, (x, y), 8, (255, 0, 255), -1)
-                cv2.putText(frame_with_info, str(i+1), (x+10, y-10),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 2)
-            
-            # Mask everything outside
-            masked_frame, mask = mask_everything_outside_track(frame, track_contour)
-            
-            # Show parameter info
-            cv2.putText(frame_with_info, f"Brightness: {brightness} (+/-)", (10, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            cv2.putText(frame_with_info, f"Erosion: {erosion_size} (</>) <-- KEY", (10, 60),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-            cv2.putText(frame_with_info, f"Corners detected: {len(track_polygon)}", (10, 90),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-            cv2.putText(frame_with_info, "GREEN = Track Contour", (10, 120),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            cv2.putText(frame_with_info, "YELLOW = Simplified Polygon", (10, 145),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-            
-            # Show results
-            cv2.imshow("1. Track Detector", frame_with_info)
-            cv2.imshow("2. Track Only (Isolated)", masked_frame)
-            
-            # Show morphology steps
-            cv2.imshow("3a. Raw White Mask", white_mask)
-            cv2.imshow("3b. After Erosion (Marble Removed)", eroded_mask)
-            cv2.imshow("3c. After Dilation (Size Restored)", dilated_mask)
-        else:
-            # No valid track found
-            cv2.putText(frame_with_info, "NO VALID TRACK", (50, 50),
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            cv2.putText(frame_with_info, "Increase EROSION (>) to remove marble", (50, 90),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 165, 255), 2)
-            
-            # Still show params
-            cv2.putText(frame_with_info, f"Brightness: {brightness} (+/-)", (10, 130),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            cv2.putText(frame_with_info, f"Erosion: {erosion_size} (</>) <-- KEY", (10, 160),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-            
-            cv2.imshow("1. Track Detector", frame_with_info)
-            
-            # Show morphology steps even when no track detected
-            cv2.imshow("3a. Raw White Mask", white_mask)
-            cv2.imshow("3b. After Erosion (Marble Removed)", eroded_mask)
-            cv2.imshow("3c. After Dilation (Size Restored)", dilated_mask)
-        
-        # Handle keyboard
-        key = cv2.waitKey(1) & 0xFF
-        
-        if key == ord('q'):
+
+        inner, outer, blue_mask = detect_blue_drop_zone(frame)
+        red_mask, tracks, obstacle_mask, obstacles = detect_red_track_and_obstacles(frame, blue_mask)
+        robot = detect_robot(frame)
+
+        vis = frame.copy()
+
+        for c in tracks:
+            cv2.drawContours(vis, [c], -1, (0, 255, 0), 3)
+
+        if outer is not None:
+            cv2.drawContours(vis, [outer], -1, (255, 0, 0), 3)
+        if inner is not None:
+            cv2.drawContours(vis, [inner], -1, (255, 150, 0), 3)
+
+        cv2.drawContours(vis, obstacles, -1, (0, 0, 255), 3)
+
+        if robot:
+            cv2.circle(vis, robot, 12, (0, 255, 255), -1)
+
+        cv2.imshow("Scorer", vis)
+        if debug:
+            cv2.imshow("Blue Mask", blue_mask)
+            cv2.imshow("Red Mask", red_mask)
+            cv2.imshow("Obstacle Mask", obstacle_mask)
+
+        if cv2.waitKey(1) & 0xFF == ord("q"):
             break
-        # Brightness adjustment
-        elif key == ord('+') or key == ord('='):
-            brightness = min(255, brightness + 5)
-            print(f"Brightness: {brightness}")
-        elif key == ord('-'):
-            brightness = max(0, brightness - 5)
-            print(f"Brightness: {brightness}")
-        # Min area adjustment
-        elif key == ord(']'):
-            min_area_pct = min(100, min_area_pct + 1)
-            print(f"Min area: {min_area_pct}%")
-        elif key == ord('['):
-            min_area_pct = max(0, min_area_pct - 1)
-            print(f"Min area: {min_area_pct}%")
-        # Max area adjustment
-        elif key == ord('}'):
-            max_area_pct = min(100, max_area_pct + 1)
-            print(f"Max area: {max_area_pct}%")
-        elif key == ord('{'):
-            max_area_pct = max(0, max_area_pct - 1)
-            print(f"Max area: {max_area_pct}%")
-        # EROSION adjustment (KEY!)
-        elif key == ord('>') or key == ord('.'):
-            erosion_size = min(50, erosion_size + 1)
-            print(f"Erosion size: {erosion_size} (removes more marble)")
-        elif key == ord('<') or key == ord(','):
-            erosion_size = max(1, erosion_size - 1)
-            print(f"Erosion size: {erosion_size} (keeps more detail)")
-    
+
     cap.release()
     cv2.destroyAllWindows()
-    
-    print(f"\nFinal settings:")
-    print(f"  Brightness: {brightness}")
-    print(f"  Erosion: {erosion_size}")
-    print(f"  Min area: {min_area_pct}%")
-    print(f"  Max area: {max_area_pct}%")
 
 
 if __name__ == "__main__":
-    # Change to 0, 1, or 2 for your camera
-    main(video_source=2)
+    main(video_source=0, debug=True)
