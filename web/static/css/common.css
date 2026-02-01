@@ -88,6 +88,10 @@ body {
 .timer-buttons .btn-end:hover { background: #b71c1c; }
 .timer-buttons button:first-child { background: #2e7d32; color: #fff; }
 .timer-buttons button:first-child:hover { background: #1b5e20; }
+.timer-buttons .btn-reset { background: #1565c0; color: #fff; }
+.timer-buttons .btn-reset:hover { background: #0d47a1; }
+.timer-buttons .btn-save, .btn-save { background: #2e7d32; color: #fff; }
+.timer-buttons .btn-save:hover, .btn-save:hover { background: #1b5e20; }
 .team-display { font-size: 1.5rem; margin-bottom: 0.5rem; opacity: 0.95; }
 
 /* Buttons and inputs */

@@ -14,6 +14,10 @@ import {
   apiSetTeam,
   apiStartTimer,
   apiStopTimer,
+  apiResetTimer,
+  apiSetBreakdown,
+  apiCommentaryPush,
+  apiSaveRun,
 } from "@/lib/api";
 
 interface LiveMatchViewProps {
@@ -35,6 +39,7 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
   const [state, setState] = useState<MatchState>(initialMatchState);
   const [teamInput, setTeamInput] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [simulateExpanded, setSimulateExpanded] = useState(false);
   const initialTeamSynced = useRef(false);
 
   useEffect(() => setMounted(true), []);
@@ -82,6 +87,34 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
   const handleStopTimer = async () => {
     const next = await apiStopTimer();
     if (next) setState(next);
+    await apiCommentaryPush();
+  };
+
+  const handleResetTimer = async () => {
+    const next = await apiResetTimer();
+    if (next) setState(next);
+  };
+
+  const handleObstacleTouch = async () => {
+    const next = await apiSetBreakdown({
+      obstacle_touches: state.obstacleTouches + 1,
+    });
+    if (next) setState(next);
+    await apiCommentaryPush();
+  };
+
+  const handleBoxDrop = async (value: "fully_in" | "partially_touching" | "mostly_out" | null) => {
+    const next = await apiSetBreakdown({ box_drop: value });
+    if (next) setState(next);
+    await apiCommentaryPush();
+  };
+
+  const handleUnder60Toggle = async () => {
+    const next = await apiSetBreakdown({
+      completed_under_60: !state.completedUnder60,
+    });
+    if (next) setState(next);
+    await apiCommentaryPush();
   };
 
   return (
@@ -134,6 +167,12 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
               >
                 <Text style={styles.timerButtonText}>END MATCH</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.timerButton, styles.timerButtonReset]}
+                onPress={handleResetTimer}
+              >
+                <Text style={styles.timerButtonText}>START NEW MATCH</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -157,12 +196,67 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
         <View style={[styles.tableRow, styles.tableRowLight]}>
           <Text style={styles.tableCellLabel}>Box Drop</Text>
           <Text style={styles.tableCellValue}>
-            {state.boxDrop.toUpperCase()}
+            {state.boxDrop === "fullyIn" ? "FULLY IN" : state.boxDrop === "partial" ? "PARTIAL" : state.boxDrop === "mostlyOut" ? "MOSTLY OUT" : "NONE"}
           </Text>
         </View>
       </View>
 
-      {/* Set team only */}
+      {/* Simulate for commentary (collapsible) */}
+      <View style={styles.simulateContainer}>
+        <TouchableOpacity
+          style={styles.simulateHeader}
+          onPress={() => setSimulateExpanded((e) => !e)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.simulateTitle}>Simulate for commentary</Text>
+          <Text style={styles.simulateChevron}>{simulateExpanded ? "▼" : "▶"}</Text>
+        </TouchableOpacity>
+        {simulateExpanded && (
+          <>
+            <View style={styles.simulateRow}>
+              <TouchableOpacity style={styles.simulateButton} onPress={handleObstacleTouch}>
+                <Text style={styles.simulateButtonText}>+ Obstacle</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.simulateButtonSmall, state.boxDrop === "none" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop(null)}
+              >
+                <Text style={styles.simulateButtonText}>None</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.simulateButtonSmall, state.boxDrop === "fullyIn" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop("fully_in")}
+              >
+                <Text style={styles.simulateButtonText}>Fully in</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.simulateButtonSmall, state.boxDrop === "partial" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop("partially_touching")}
+              >
+                <Text style={styles.simulateButtonText}>Partial</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.simulateButtonSmall, state.boxDrop === "mostlyOut" && styles.simulateButtonActive]}
+                onPress={() => handleBoxDrop("mostly_out")}
+              >
+                <Text style={styles.simulateButtonText}>Mostly out</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.simulateRow}>
+              <TouchableOpacity
+                style={[styles.simulateButton, state.completedUnder60 && styles.simulateButtonActive]}
+                onPress={handleUnder60Toggle}
+              >
+                <Text style={styles.simulateButtonText}>
+                  Under 60s: {state.completedUnder60 ? "YES" : "NO"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </View>
+
+      {/* Set team + Save run */}
       <View style={styles.controlsContainer}>
         <View style={styles.controlRow}>
           <TextInput
@@ -175,6 +269,9 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
           />
           <TouchableOpacity style={styles.button} onPress={handleSetTeam}>
             <Text style={styles.buttonText}>SET TEAM</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.button, styles.buttonSave]} onPress={() => apiSaveRun()}>
+            <Text style={styles.buttonText}>SAVE RUN</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -313,6 +410,9 @@ const styles = StyleSheet.create({
   timerButtonEnd: {
     backgroundColor: "#EF4444",
   },
+  timerButtonReset: {
+    backgroundColor: COLORS.darkBlue,
+  },
   timerButtonText: {
     color: COLORS.white,
     fontSize: 14,
@@ -358,6 +458,61 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  simulateContainer: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: COLORS.headerDark,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: COLORS.white,
+    zIndex: 1,
+  },
+  simulateHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  simulateTitle: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  simulateChevron: {
+    color: COLORS.white,
+    fontSize: 12,
+  },
+  simulateRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 8,
+  },
+  simulateButton: {
+    backgroundColor: COLORS.darkBlue,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: COLORS.white,
+  },
+  simulateButtonSmall: {
+    backgroundColor: COLORS.darkBlue,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: COLORS.white,
+  },
+  simulateButtonActive: {
+    backgroundColor: COLORS.yellow,
+  },
+  simulateButtonText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: "bold",
+  },
   controlsContainer: {
     padding: 20,
     gap: 10,
@@ -384,6 +539,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 2,
     borderColor: COLORS.white,
+  },
+  buttonSave: {
+    backgroundColor: "#22C55E",
   },
   buttonText: {
     color: COLORS.white,

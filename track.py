@@ -20,7 +20,8 @@ class SimpleScorer:
         self.box_score = 0
 
     def get_obstacle_score(self):
-        return max(0, 5 - self.obstacle_hits)
+        """0 touches = +5, 1 = +4, 2 = +3, etc.; can go negative if touches > 5."""
+        return 5 - self.obstacle_hits
 
     def get_total_score(self):
         return self.box_score + self.get_obstacle_score()

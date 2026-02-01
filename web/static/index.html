@@ -24,6 +24,7 @@
       <div class="controls-row timer-buttons">
         <button type="button" id="btn-start-timer">Start match</button>
         <button type="button" id="btn-stop-timer" class="btn-end">End match</button>
+        <button type="button" id="btn-reset-timer" class="btn-reset">Start new match</button>
       </div>
     </div>
 
@@ -32,6 +33,7 @@
       <div class="controls-row">
         <label>Team number: <input type="text" id="team-number" value="1" placeholder="e.g. 12" /></label>
         <button type="button" id="btn-set-team">Set team</button>
+        <button type="button" id="btn-save-run" class="btn-save">Save run</button>
         <span id="set-team-feedback" class="note"></span>
       </div>
     </div>
@@ -71,6 +73,21 @@
         const r = await fetch('/api/timer/stop', { method: 'POST' });
         const state = await r.json();
         renderState(state);
+      } catch (e) {}
+    };
+
+    document.getElementById('btn-reset-timer').onclick = async () => {
+      try {
+        const r = await fetch('/api/timer/reset', { method: 'POST' });
+        const state = await r.json();
+        renderState(state);
+      } catch (e) {}
+    };
+
+    document.getElementById('btn-save-run').onclick = async () => {
+      try {
+        await fetch('/api/test/save_run', { method: 'POST' });
+        pollState();
       } catch (e) {}
     };
 

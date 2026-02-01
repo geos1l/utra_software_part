@@ -44,7 +44,7 @@ def main():
             "team_id": "TEAM_01",
             "score_total": 0,
             "t_elapsed_s": 0.0,
-            "score_breakdown": {"obstacle": 0, "completed_under_60": 0, "box_drop": 0},
+            "score_breakdown": {"obstacles": 0, "completed_under_60": 0, "box_drop": 0},
             "notable_event": True,
         },
         # DEMO: First scoring — obstacle course clean (5 pts)
@@ -52,7 +52,7 @@ def main():
             "team_id": "TEAM_01",
             "score_total": 5,
             "t_elapsed_s": 12.0,
-            "score_breakdown": {"obstacle": 5, "completed_under_60": 0, "box_drop": 0},
+            "score_breakdown": {"obstacles": 5, "completed_under_60": 0, "box_drop": 0},
             "notable_event": True,
         },
         # DEMO: Box drop fully in (+5)
@@ -60,7 +60,7 @@ def main():
             "team_id": "TEAM_01",
             "score_total": 10,
             "t_elapsed_s": 28.0,
-            "score_breakdown": {"obstacle": 5, "completed_under_60": 0, "box_drop": 5},
+            "score_breakdown": {"obstacles": 5, "completed_under_60": 0, "box_drop": 5},
             "notable_event": True,
         },
         # DEMO: One obstacle touch (obstacle 4, total 9)
@@ -68,7 +68,7 @@ def main():
             "team_id": "TEAM_01",
             "score_total": 9,
             "t_elapsed_s": 35.0,
-            "score_breakdown": {"obstacle": 4, "completed_under_60": 0, "box_drop": 5},
+            "score_breakdown": {"obstacles": 4, "completed_under_60": 0, "box_drop": 5},
             "notable_event": True,
         },
         # DEMO: Box adjusted to partially touching (box 4, total 12)
@@ -76,7 +76,7 @@ def main():
             "team_id": "TEAM_01",
             "score_total": 12,
             "t_elapsed_s": 48.0,
-            "score_breakdown": {"obstacle": 4, "completed_under_60": 0, "box_drop": 4},
+            "score_breakdown": {"obstacles": 4, "completed_under_60": 0, "box_drop": 4},
             "notable_event": True,
         },
         # DEMO: Finish under 60s (+5 time bonus, total 17)
@@ -84,7 +84,7 @@ def main():
             "team_id": "TEAM_01",
             "score_total": 17,
             "t_elapsed_s": 58.5,
-            "score_breakdown": {"obstacle": 4, "completed_under_60": 5, "box_drop": 4},
+            "score_breakdown": {"obstacles": 4, "completed_under_60": 5, "box_drop": 4},
             "notable_event": True,
         },
     ]

@@ -13,7 +13,7 @@ class Settings:
 
     # Gemini via OpenRouter (live commentary)
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "google/gemini-2.5-flash-lite")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "google/gemini-3-flash-preview")
 
     # ElevenLabs TTS (mirrors Hackhive Project 2026)
     ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
@@ -36,6 +36,11 @@ class Settings:
     # Commentary rate limiting
     FILLER_INTERVAL_SEC = float(os.getenv("FILLER_INTERVAL_SEC", "12.0"))
     MAX_PAYLOADS_PER_CALL = int(os.getenv("MAX_PAYLOADS_PER_CALL", "3"))
+
+    # MongoDB Atlas (leaderboard persistence)
+    MONGODB_URI = os.getenv("MONGODB_URI", "")
+    MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "utra_match")
+    MONGODB_COLLECTION = os.getenv("MONGODB_COLLECTION", "matches")
 
     # Paths
     PROJECT_ROOT = Path(__file__).resolve().parent.parent

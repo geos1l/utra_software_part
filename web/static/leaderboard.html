@@ -22,11 +22,10 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>Rank</th>
             <th>Team</th>
             <th style="text-align:right;">Score</th>
             <th style="text-align:right;">Time</th>
-            <th>Obstacle</th>
+            <th>Obstacles</th>
             <th>Under 60s</th>
             <th>Box drop</th>
           </tr>
@@ -51,15 +50,14 @@
         const tbody = document.getElementById('leaderboard-body');
         const emptyMsg = document.getElementById('empty-msg');
         if (!list || list.length === 0) {
-          tbody.innerHTML = '';
           emptyMsg.style.display = 'block';
+          tbody.innerHTML = '<tr><td>—</td><td>—</td><td style="text-align:right;">0</td><td style="text-align:right;">0:00</td><td>0</td><td>—</td><td>—</td></tr>';
           return;
         }
         emptyMsg.style.display = 'none';
-        tbody.innerHTML = list.map((row, i) => {
-          const b = row.score_breakdown || {};
-          return '<tr><td>' + (i + 1) + '</td><td>' + (row.team_display || row.team_number) + '</td><td style="text-align:right;">' + row.score_total + '</td><td style="text-align:right;">' + formatTime(row.t_elapsed_s || 0) + '</td><td>' + (b.obstacle ?? 0) + '</td><td>' + (b.completed_under_60 ?? 0) + '</td><td>' + (b.box_drop ?? 0) + '</td></tr>';
-        }).join('');
+        tbody.innerHTML = list.map((row, i) =>
+          '<tr><td>' + (row.team_display || row.team_number) + '</td><td style="text-align:right;">' + row.score_total + '</td><td style="text-align:right;">' + formatTime(row.t_elapsed_s || 0) + '</td><td>' + (row.obstacle_touches ?? 0) + '</td><td>' + (row.completed_under_60 ? '✓' : '—') + '</td><td>' + (row.box_drop || '—') + '</td></tr>'
+        ).join('');
       } catch (e) {}
     }
     setInterval(pollLeaderboard, 2000);

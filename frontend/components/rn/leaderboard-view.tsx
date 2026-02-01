@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,8 +7,9 @@ import {
   ScrollView,
   Dimensions,
 } from "react-native";
+import { useState, useEffect, useCallback } from "react";
 import { COLORS, type LeaderboardEntry } from "@/lib/types";
-import { fetchLeaderboard } from "@/lib/api";
+import { fetchLeaderboard, LEADERBOARD_SAVED_EVENT } from "@/lib/api";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -18,23 +18,34 @@ interface LeaderboardViewProps {
 }
 
 export function LeaderboardView({ backgroundNumber = "1" }: LeaderboardViewProps) {
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([
-    { rank: 1, team: "5614", score: 223, time: "0:58", obstacleTouches: 12, completedUnder60: true, boxDrop: "barge" },
-    { rank: 2, team: "1690", score: 187, time: "1:02", obstacleTouches: 10, completedUnder60: false, boxDrop: "barge" },
-    { rank: 3, team: "5928", score: 162, time: "0:55", obstacleTouches: 9, completedUnder60: true, boxDrop: "net" },
-    { rank: 4, team: "3083", score: 51, time: "1:15", obstacleTouches: 4, completedUnder60: false, boxDrop: "none" },
-    { rank: 5, team: "4338", score: 45, time: "1:22", obstacleTouches: 3, completedUnder60: false, boxDrop: "net" },
-  ]);
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+
+  const load = useCallback(async () => {
+    const list = await fetchLeaderboard();
+    setEntries(list);
+  }, []);
 
   useEffect(() => {
-    const load = async () => {
-      const list = await fetchLeaderboard();
-      if (list.length > 0) setEntries(list);
-    };
     load();
     const interval = setInterval(load, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [load]);
+
+  // Refetch when a run is saved (from Live tab) or when user switches back to this tab
+  useEffect(() => {
+    const onSaved = (e: Event) => {
+      const detail = (e as CustomEvent<LeaderboardEntry[] | undefined>).detail;
+      if (Array.isArray(detail) && detail.length > 0) setEntries(detail);
+      else load();
+    };
+    const onVisibility = () => { if (typeof document !== "undefined" && document.visibilityState === "visible") load(); };
+    window.addEventListener(LEADERBOARD_SAVED_EVENT, onSaved);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener(LEADERBOARD_SAVED_EVENT, onSaved);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [load]);
 
   return (
     <View style={styles.container}>
@@ -70,9 +81,8 @@ export function LeaderboardView({ backgroundNumber = "1" }: LeaderboardViewProps
 
         {/* Leaderboard Table */}
         <View style={styles.tableContainer}>
-          {/* Table Header */}
+          {/* Table Header: Team = team number only (no separate # column) */}
           <View style={styles.tableHeaderRow}>
-            <Text style={[styles.tableHeaderCell, styles.cellRank]}>#</Text>
             <Text style={[styles.tableHeaderCell, styles.cellTeam]}>TEAM</Text>
             <Text style={[styles.tableHeaderCell, styles.cellScore]}>SCORE</Text>
             <Text style={[styles.tableHeaderCell, styles.cellTime]}>TIME</Text>
@@ -81,18 +91,23 @@ export function LeaderboardView({ backgroundNumber = "1" }: LeaderboardViewProps
             <Text style={[styles.tableHeaderCell, styles.cellBox]}>BOX</Text>
           </View>
 
-          {/* Table Rows */}
-          {entries.map((entry, index) => (
+          {/* Table Rows: placeholder with 0/— when empty, else real entries */}
+          {(entries.length === 0 ? [{
+            rank: 0,
+            team: "—",
+            score: 0,
+            time: "0:00",
+            obstacleTouches: 0,
+            completedUnder60: false,
+            boxDrop: "none" as const,
+          }] : entries).map((entry, index) => (
             <View
-              key={entry.team}
+              key={entries.length === 0 ? "placeholder" : `${entry.team}-${index}`}
               style={[
                 styles.tableRow,
                 index % 2 === 0 ? styles.tableRowLight : styles.tableRowDark,
               ]}
             >
-              <Text style={[styles.tableCell, styles.cellRank, styles.rankText]}>
-                {entry.rank}
-              </Text>
               <View style={[styles.cellTeam]}>
                 <View style={styles.teamBadge}>
                   <Text style={styles.teamBadgeText}>{entry.team}</Text>
@@ -250,9 +265,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
   },
-  cellRank: {
-    width: 40,
-  },
   cellTeam: {
     width: 80,
     alignItems: "center",
@@ -271,10 +283,6 @@ const styles = StyleSheet.create({
   },
   cellBox: {
     width: 50,
-  },
-  rankText: {
-    fontSize: 18,
-    fontWeight: "bold",
   },
   scoreText: {
     fontSize: 20,

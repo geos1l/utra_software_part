@@ -27,7 +27,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>Obstacle (5 − touches)</td><td style="text-align:right;" id="bd-obstacle">0</td></tr>
+          <tr><td>Obstacles (5 − touches)</td><td style="text-align:right;" id="bd-obstacles">0</td></tr>
           <tr><td>Completed under 60s</td><td style="text-align:right;" id="bd-under60">0</td></tr>
           <tr><td>Box drop</td><td style="text-align:right;" id="bd-box">0</td></tr>
           <tr class="total-row"><td>Total</td><td style="text-align:right;" id="bd-total">0</td></tr>
@@ -43,7 +43,7 @@
         const state = await r.json();
         document.getElementById('breakdown-title').textContent = 'Score breakdown — ' + (state.team_display || ('Team ' + (state.team_number || '—')));
         const bd = state.score_breakdown || {};
-        document.getElementById('bd-obstacle').textContent = bd.obstacle ?? 0;
+        document.getElementById('bd-obstacles').textContent = bd.obstacles ?? 0;
         document.getElementById('bd-under60').textContent = bd.completed_under_60 ?? 0;
         document.getElementById('bd-box').textContent = bd.box_drop ?? 0;
         document.getElementById('bd-total').textContent = state.score_total ?? 0;

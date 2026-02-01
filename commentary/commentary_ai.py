@@ -1,14 +1,22 @@
-"""Gemini commentary from match telemetry (OpenRouter, mirrors Hackhive llm_providers)."""
+"""Gemini commentary from match telemetry (OpenRouter)."""
 import json
 from openai import OpenAI
 
-SYSTEM_PROMPT = """You are a live commentator for a robot competition. You receive match telemetry as JSON (team_id, score_total, t_elapsed_s, score_breakdown). You may receive one payload or several in chronological order as a JSON array. Base your commentary only on the data given; do not invent or guess. If you receive multiple updates, treat them as one short story in 1-2 hype lines. Output plain text only: 1-2 short hype lines, no JSON, no bullet points."""
+SYSTEM_PROMPT = """You are a live commentator for a timed obstacle-course run. This is NOT head-to-head competition: one robot runs the track by itself. There is no "victory" or "winner"—comment on the robot's performance (time, clean run, box placement, finishing under 60s).
+
+You receive match telemetry as JSON: team_id, score_total, t_elapsed_s, score_breakdown, obstacle_touches (count), and optionally match_ended. You may get one payload or several in chronological order as a JSON array. Use the full sequence as context: refer to what changed (e.g. "after that touch", "now the box drop") and vary your wording—do not repeat the same phrases. Each response should feel like the next beat in one story.
+
+Time context: Maximum match time is 5 minutes (300 seconds). Finishing under 60s is very good and earns +5 pts at the end. Use t_elapsed_s to comment on pace: e.g. if the match ends unreasonably early (e.g. <30s) something likely went wrong—comment on that; if they finish just under 5 minutes (e.g. 4:55) comment on barely making it; if they're flying through, say so.
+
+Scoring: Obstacles are BAD—during the match each touch subtracts 1 (score_breakdown.obstacles is 0, −1, −2, …). At the end of the match we add 5 once (so 5 touches = net 0, 0 touches = +5). obstacle_touches is the count. Comment on touches when they change (e.g. "that's 2 touches", "clean run so far"). "Box drop" means dropping the box in a designated square/area; points depend on how well it lands (fully in, partially touching, or mostly out). The +5 "under 60s" bonus is only awarded at the end if the robot finishes the track in under 60 seconds.
+
+When match_ended is true (usually the last payload), end with a clear wrap-up line for the run (e.g. "That's the run!", "Performance complete."). Do not rate or judge scores (e.g. avoid phrases like "a great score of X points")—state the score or context neutrally without evaluative language. Base commentary only on the data given; do not invent. Output plain text only: 1-2 short lines, no JSON, no bullet points."""
 
 
 class CommentaryAI:
     """Generate commentary from payload(s) via Gemini (OpenRouter)."""
 
-    def __init__(self, api_key: str, model: str = "google/gemini-2.5-flash-lite"):
+    def __init__(self, api_key: str, model: str = "google/gemini-3-flash-preview"):
         self.client = OpenAI(
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",

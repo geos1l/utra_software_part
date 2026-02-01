@@ -8,3 +8,4 @@ scipy
 fastapi
 uvicorn
 keyboard>=0.13.5
+pymongo>=4.0

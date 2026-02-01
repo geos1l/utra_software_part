@@ -1,7 +1,7 @@
 /**
  * API client: maps backend (FastAPI) response to frontend types.
  * Backend: snake_case, team_number, t_elapsed_s, score_breakdown, box_drop "fully_in"|"partially_touching"|"mostly_out"|null
- * Frontend: camelCase, teamNumber, timerSeconds, boxDrop "none"|"net"|"barge"
+ * Frontend: camelCase, teamNumber, timerSeconds, boxDrop "none"|"fullyIn"|"partial"|"mostlyOut"
  */
 
 import type { MatchState, LeaderboardEntry } from "./types";
@@ -16,15 +16,16 @@ export interface BackendState {
   score_total?: number;
   t_elapsed_s?: number;
   timer_running?: boolean;
-  score_breakdown?: { obstacle?: number; completed_under_60?: number; box_drop?: number };
+  score_breakdown?: { obstacles?: number; completed_under_60?: number; box_drop?: number };
   obstacle_touches?: number;
   completed_under_60?: boolean;
   box_drop?: string | null;
 }
 
-function mapBoxDropBackendToFrontend(value: string | null | undefined): "none" | "net" | "barge" {
-  if (value === "fully_in" || value === "partially_touching") return "net";
-  if (value === "mostly_out") return "barge";
+function mapBoxDropBackendToFrontend(value: string | null | undefined): "none" | "fullyIn" | "partial" | "mostlyOut" {
+  if (value === "fully_in") return "fullyIn";
+  if (value === "partially_touching") return "partial";
+  if (value === "mostly_out") return "mostlyOut";
   return "none";
 }
 
@@ -40,7 +41,7 @@ export function mapBackendStateToMatchState(data: BackendState): MatchState {
     boxDrop: mapBoxDropBackendToFrontend(data.box_drop),
     scoreBreakdown: bd
       ? {
-          obstacle: bd.obstacle ?? 0,
+          obstacles: bd.obstacles ?? 0,
           completedUnder60: bd.completed_under_60 ?? 0,
           boxDrop: bd.box_drop ?? 0,
         }
@@ -48,10 +49,11 @@ export function mapBackendStateToMatchState(data: BackendState): MatchState {
   };
 }
 
-export function mapBoxDropFrontendToBackend(value: "none" | "net" | "barge"): string | null {
+export function mapBoxDropFrontendToBackend(value: "none" | "fullyIn" | "partial" | "mostlyOut"): string | null {
   if (value === "none") return null;
-  if (value === "net") return "fully_in";
-  if (value === "barge") return "mostly_out";
+  if (value === "fullyIn") return "fully_in";
+  if (value === "partial") return "partially_touching";
+  if (value === "mostlyOut") return "mostly_out";
   return null;
 }
 
@@ -75,7 +77,7 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
       team_display?: string;
       score_total?: number;
       t_elapsed_s?: number;
-      score_breakdown?: { obstacle?: number; completed_under_60?: number; box_drop?: number };
+      score_breakdown?: { obstacles?: number; completed_under_60?: number; box_drop?: number };
       obstacle_touches?: number;
       completed_under_60?: boolean;
       box_drop?: string | null;
@@ -85,7 +87,7 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
       team: row.team_display ?? row.team_number ?? "—",
       score: row.score_total ?? 0,
       time: formatTime(row.t_elapsed_s ?? 0),
-      obstacleTouches: row.score_breakdown?.obstacle ?? row.obstacle_touches ?? 0,
+      obstacleTouches: row.obstacle_touches ?? 0,
       completedUnder60: row.completed_under_60 ?? false,
       boxDrop: mapBoxDropBackendToFrontend(row.box_drop),
     }));
@@ -114,6 +116,17 @@ export async function apiStartTimer(): Promise<MatchState | null> {
 export async function apiStopTimer(): Promise<MatchState | null> {
   try {
     const res = await fetch(`${API_BASE}/api/timer/stop`, { method: "POST" });
+    if (!res.ok) return null;
+    const data: BackendState = await res.json();
+    return mapBackendStateToMatchState(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function apiResetTimer(): Promise<MatchState | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/timer/reset`, { method: "POST" });
     if (!res.ok) return null;
     const data: BackendState = await res.json();
     return mapBackendStateToMatchState(data);
@@ -156,10 +169,41 @@ export async function apiSetBreakdown(payload: {
   }
 }
 
-export async function apiSaveRun(): Promise<void> {
+/** Event dispatched when a run is saved so Leaderboard can refetch. */
+export const LEADERBOARD_SAVED_EVENT = "leaderboard-saved";
+
+export async function apiSaveRun(): Promise<LeaderboardEntry[] | null> {
   try {
-    await fetch(`${API_BASE}/api/test/save_run`, { method: "POST" });
+    const res = await fetch(`${API_BASE}/api/test/save_run`, { method: "POST" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const list = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+    const entries: LeaderboardEntry[] = list.map(
+      (row: { team_display?: string; team_number?: string; score_total?: number; t_elapsed_s?: number; obstacle_touches?: number; completed_under_60?: boolean; box_drop?: string | null },
+       i: number) => ({
+        rank: i + 1,
+        team: row.team_display ?? row.team_number ?? "—",
+        score: row.score_total ?? 0,
+        time: formatTime(row.t_elapsed_s ?? 0),
+        obstacleTouches: row.obstacle_touches ?? 0,
+        completedUnder60: row.completed_under_60 ?? false,
+        boxDrop: mapBoxDropBackendToFrontend(row.box_drop),
+      })
+    );
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(LEADERBOARD_SAVED_EVENT, { detail: entries }));
+    return entries;
   } catch {
-    // ignore
+    return null;
+  }
+}
+
+export async function apiCommentaryPush(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/commentary/push`, { method: "POST" });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.pushed === true;
+  } catch {
+    return false;
   }
 }

@@ -24,7 +24,7 @@ export function ScoreBreakdownView({ backgroundNumber = "8" }: ScoreBreakdownVie
     isRunning: false,
     obstacleTouches: 9,
     completedUnder60: true,
-    boxDrop: "barge",
+    boxDrop: "none",
   });
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export function ScoreBreakdownView({ backgroundNumber = "8" }: ScoreBreakdownVie
 
   // Use backend score breakdown when available (5-touches, under60=5, box_drop=5/4/1)
   const bd = state.scoreBreakdown;
-  const obstaclePoints = bd?.obstacle ?? 0;
+  const obstaclePoints = bd?.obstacles ?? 0;
   const under60Points = bd?.completedUnder60 ?? (state.completedUnder60 ? 5 : 0);
   const boxDropPoints = bd?.boxDrop ?? 0;
   const totalScore = state.score;
@@ -76,9 +76,9 @@ export function ScoreBreakdownView({ backgroundNumber = "8" }: ScoreBreakdownVie
             <Text style={styles.tableHeaderCellRight}>POINTS</Text>
           </View>
 
-          {/* Obstacle (5 − touches) */}
+          {/* Obstacles (5 − touches) */}
           <View style={[styles.tableRow, styles.tableRowLight]}>
-            <Text style={styles.tableCellLabel}>OBSTACLE</Text>
+            <Text style={styles.tableCellLabel}>OBSTACLES</Text>
             <Text style={styles.tableCellValue}>{obstaclePoints}</Text>
           </View>
 
@@ -90,7 +90,7 @@ export function ScoreBreakdownView({ backgroundNumber = "8" }: ScoreBreakdownVie
 
           {/* Box Drop (5/4/1) */}
           <View style={[styles.tableRow, styles.tableRowLight]}>
-            <Text style={styles.tableCellLabel}>BOX DROP ({state.boxDrop.toUpperCase()})</Text>
+            <Text style={styles.tableCellLabel}>BOX DROP ({state.boxDrop === "fullyIn" ? "FULLY IN" : state.boxDrop === "partial" ? "PARTIAL" : state.boxDrop === "mostlyOut" ? "MOSTLY OUT" : "NONE"})</Text>
             <Text style={styles.tableCellValue}>{boxDropPoints}</Text>
           </View>
 

@@ -1,5 +1,5 @@
 export interface ScoreBreakdown {
-  obstacle: number;
+  obstacles: number;
   completedUnder60: number;
   boxDrop: number;
 }
@@ -11,8 +11,8 @@ export interface MatchState {
   isRunning: boolean;
   obstacleTouches: number;
   completedUnder60: boolean;
-  boxDrop: "none" | "net" | "barge";
-  /** Points from backend (obstacle = 5-touches, under60 = 5, box_drop = 5/4/1) */
+  boxDrop: "none" | "fullyIn" | "partial" | "mostlyOut";
+  /** Points from backend (obstacles = 5-touches, under60 = 5, box_drop = 5/4/1) */
   scoreBreakdown?: ScoreBreakdown;
 }
 
@@ -23,7 +23,7 @@ export interface LeaderboardEntry {
   time: string;
   obstacleTouches: number;
   completedUnder60: boolean;
-  boxDrop: "none" | "net" | "barge";
+  boxDrop: "none" | "fullyIn" | "partial" | "mostlyOut";
 }
 
 export const COLORS = {
