@@ -54,6 +54,13 @@ body {
   margin-bottom: 1.5rem;
 }
 
+.panel-centered {
+  text-align: center;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* FRC-style table: alternating grey rows, white text */
 .data-table {
   width: 100%;
@@ -76,6 +83,11 @@ body {
 /* Live page: big score and timer */
 .score-display { font-size: 3rem; font-weight: bold; margin: 0.25rem 0; }
 .timer-display { font-size: 2rem; font-family: "Consolas", monospace; margin: 0.25rem 0; }
+.timer-buttons { margin-top: 1rem; justify-content: center; }
+.timer-buttons .btn-end { background: #c62828; color: #fff; }
+.timer-buttons .btn-end:hover { background: #b71c1c; }
+.timer-buttons button:first-child { background: #2e7d32; color: #fff; }
+.timer-buttons button:first-child:hover { background: #1b5e20; }
 .team-display { font-size: 1.5rem; margin-bottom: 0.5rem; opacity: 0.95; }
 
 /* Buttons and inputs */

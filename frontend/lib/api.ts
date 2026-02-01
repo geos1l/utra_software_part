@@ -111,6 +111,17 @@ export async function apiStartTimer(): Promise<MatchState | null> {
   }
 }
 
+export async function apiStopTimer(): Promise<MatchState | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/timer/stop`, { method: "POST" });
+    if (!res.ok) return null;
+    const data: BackendState = await res.json();
+    return mapBackendStateToMatchState(data);
+  } catch {
+    return null;
+  }
+}
+
 export async function apiSetTeam(team: string): Promise<MatchState | null> {
   try {
     const res = await fetch(`${API_BASE}/api/set_team`, {

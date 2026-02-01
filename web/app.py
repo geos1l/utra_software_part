@@ -25,21 +25,31 @@ except ImportError:
 
 
 def _timer_key_listener():
-    """Backend: when TIMER_START_KEY is pressed, start timer (debounced)."""
+    """Backend: TIMER_START_KEY starts match, TIMER_STOP_KEY ends match (debounced)."""
     if not HAS_KEYBOARD:
         return
-    key = Settings.TIMER_START_KEY
-    started = False
+    start_key = Settings.TIMER_START_KEY
+    stop_key = Settings.TIMER_STOP_KEY
+    started_pressed = False
+    stopped_pressed = False
     while True:
         try:
-            if keyboard.is_pressed(key):
-                if not started:
+            if keyboard.is_pressed(start_key):
+                if not started_pressed:
                     match_state.set_timer_started()
-                    started = True
+                    started_pressed = True
                     print("[Timer] Started (key press).")
                 time.sleep(0.5)
             else:
-                started = False
+                started_pressed = False
+            if keyboard.is_pressed(stop_key):
+                if not stopped_pressed:
+                    match_state.set_timer_stopped()
+                    stopped_pressed = True
+                    print("[Timer] Ended (key press).")
+                time.sleep(0.5)
+            else:
+                stopped_pressed = False
         except Exception:
             pass
         time.sleep(0.05)
@@ -92,6 +102,13 @@ class SetTeamBody(BaseModel):
 def start_timer():
     """Start the match timer (call from page or key press)."""
     match_state.set_timer_started()
+    return match_state.get_state()
+
+
+@app.post("/api/timer/stop")
+def stop_timer():
+    """End the match timer (stops and resets for next match)."""
+    match_state.set_timer_stopped()
     return match_state.get_state()
 
 

@@ -1,23 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Image,
 } from "react-native";
 import { COLORS, type MatchState } from "@/lib/types";
 import {
-  API_BASE,
   fetchState,
-  apiStartTimer,
   apiSetTeam,
-  apiSetBreakdown,
-  apiSaveRun,
-  mapBoxDropFrontendToBackend,
+  apiStartTimer,
+  apiStopTimer,
 } from "@/lib/api";
 
 interface LiveMatchViewProps {
@@ -25,31 +21,41 @@ interface LiveMatchViewProps {
   onTeamSet?: (team: string) => void;
 }
 
+const initialMatchState: MatchState = {
+  teamNumber: "—",
+  score: 0,
+  timerSeconds: 0,
+  isRunning: false,
+  obstacleTouches: 0,
+  completedUnder60: false,
+  boxDrop: "none",
+};
+
 export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchViewProps) {
-  const [state, setState] = useState<MatchState>({
-    teamNumber: "3083",
-    score: 51,
-    timerSeconds: 0,
-    isRunning: false,
-    obstacleTouches: 0,
-    completedUnder60: false,
-    boxDrop: "none",
-  });
+  const [state, setState] = useState<MatchState>(initialMatchState);
   const [teamInput, setTeamInput] = useState("");
   const [mounted, setMounted] = useState(false);
+  const initialTeamSynced = useRef(false);
 
   useEffect(() => setMounted(true), []);
 
-  // Poll state from API (use mapped camelCase from lib/api)
+  // Poll state from API; sync team to parent once on first successful fetch
   useEffect(() => {
     const poll = async () => {
       const next = await fetchState();
-      if (next) setState(next);
+      if (next) {
+        setState(next);
+        if (!initialTeamSynced.current && next.teamNumber) {
+          const raw = next.teamNumber.replace(/^Team\s*/i, "").trim() || next.teamNumber;
+          onTeamSet?.(raw);
+          initialTeamSynced.current = true;
+        }
+      }
     };
     const interval = setInterval(poll, 500);
     poll();
     return () => clearInterval(interval);
-  }, []);
+  }, [onTeamSet]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -57,49 +63,25 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const handleSetTeam = async () => {
+    if (!teamInput.trim()) return;
+    const raw = teamInput.trim();
+    // Update display immediately (same variable as background + team box above score)
+    onTeamSet?.(raw);
+    setTeamInput("");
+    // Optionally sync to backend
+    const next = await apiSetTeam(raw);
+    if (next) setState(next);
+  };
+
   const handleStartTimer = async () => {
     const next = await apiStartTimer();
     if (next) setState(next);
-    else setState((prev) => ({ ...prev, isRunning: !prev.isRunning }));
   };
 
-  const handleSetTeam = async () => {
-    if (!teamInput.trim()) return;
-    const next = await apiSetTeam(teamInput.trim());
-    const teamForDisplay = next?.teamNumber ?? teamInput.trim();
-    if (next) {
-      setState(next);
-      onTeamSet?.(teamForDisplay.replace(/^Team\s*/i, "").trim() || teamForDisplay);
-    } else {
-      setState((prev) => ({ ...prev, teamNumber: teamInput.trim() }));
-      onTeamSet?.(teamInput.trim());
-    }
-    setTeamInput("");
-  };
-
-  const handleObstacleTouch = async () => {
-    const newTouches = state.obstacleTouches + 1;
-    const next = await apiSetBreakdown({ obstacle_touches: newTouches });
+  const handleStopTimer = async () => {
+    const next = await apiStopTimer();
     if (next) setState(next);
-    else setState((prev) => ({ ...prev, obstacleTouches: newTouches }));
-  };
-
-  const handleToggleUnder60 = async () => {
-    const newValue = !state.completedUnder60;
-    const next = await apiSetBreakdown({ completed_under_60: newValue });
-    if (next) setState(next);
-    else setState((prev) => ({ ...prev, completedUnder60: newValue }));
-  };
-
-  const handleBoxDrop = async (value: "none" | "net" | "barge") => {
-    const backendValue = mapBoxDropFrontendToBackend(value);
-    const next = await apiSetBreakdown({ box_drop: backendValue });
-    if (next) setState(next);
-    else setState((prev) => ({ ...prev, boxDrop: value }));
-  };
-
-  const handleSaveRun = async () => {
-    await apiSaveRun();
   };
 
   return (
@@ -117,22 +99,19 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
         <Text style={styles.headerSubtitle}>Round 1 - Match 1</Text>
       </View>
 
-      {/* Main Content */}
+      {/* Main Content - centered score/timer block */}
       <View style={styles.mainContent}>
-        {/* Left Side - Team Info & Score */}
-        <View style={styles.leftPanel}>
-          {/* Team Number Box (placeholder until mount to avoid hydration mismatch) */}
+        <View style={styles.centerPanel}>
+          {/* Team Number Box - same value as background (parent state) */}
           <View style={styles.teamBox}>
             <Text style={styles.teamNumber} suppressHydrationWarning>
-              {mounted ? state.teamNumber : "—"}
+              {mounted ? (backgroundNumber || "—") : "—"}
             </Text>
           </View>
 
-          {/* Score */}
           <Text style={styles.scoreLabel}>SCORE</Text>
           <Text style={styles.score}>{state.score}</Text>
 
-          {/* Timer */}
           <View style={styles.timerContainer}>
             <Text style={styles.timerLabel}>TIME</Text>
             <Text style={styles.timer}>{formatTime(state.timerSeconds)}</Text>
@@ -142,19 +121,19 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
                 state.isRunning ? styles.statusRunning : styles.statusStopped,
               ]}
             />
-          </View>
-        </View>
-
-        {/* Right Side - Video Stream */}
-        <View style={styles.rightPanel}>
-          <View style={styles.videoContainer}>
-            <Image
-              source={{ uri: `${API_BASE}/stream` }}
-              style={styles.videoStream}
-              resizeMode="cover"
-            />
-            <View style={styles.videoOverlay}>
-              <Text style={styles.videoOverlayText}>LIVE FEED</Text>
+            <View style={styles.timerButtons}>
+              <TouchableOpacity
+                style={[styles.timerButton, styles.timerButtonStart]}
+                onPress={handleStartTimer}
+              >
+                <Text style={styles.timerButtonText}>START MATCH</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.timerButton, styles.timerButtonEnd]}
+                onPress={handleStopTimer}
+              >
+                <Text style={styles.timerButtonText}>END MATCH</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -183,7 +162,7 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
         </View>
       </View>
 
-      {/* Controls */}
+      {/* Set team only */}
       <View style={styles.controlsContainer}>
         <View style={styles.controlRow}>
           <TextInput
@@ -196,51 +175,6 @@ export function LiveMatchView({ backgroundNumber = "8", onTeamSet }: LiveMatchVi
           />
           <TouchableOpacity style={styles.button} onPress={handleSetTeam}>
             <Text style={styles.buttonText}>SET TEAM</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, styles.buttonPrimary]}
-            onPress={handleStartTimer}
-          >
-            <Text style={styles.buttonText}>
-              {state.isRunning ? "STOP" : "START"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.controlRow}>
-          <TouchableOpacity style={styles.button} onPress={handleObstacleTouch}>
-            <Text style={styles.buttonText}>+ OBSTACLE</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              state.completedUnder60 && styles.buttonActive,
-            ]}
-            onPress={handleToggleUnder60}
-          >
-            <Text style={styles.buttonText}>UNDER 60s</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.controlRow}>
-          {(["none", "net", "barge"] as const).map((option) => (
-            <TouchableOpacity
-              key={option}
-              style={[
-                styles.button,
-                styles.buttonSmall,
-                state.boxDrop === option && styles.buttonActive,
-              ]}
-              onPress={() => handleBoxDrop(option)}
-            >
-              <Text style={styles.buttonText}>{option.toUpperCase()}</Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity
-            style={[styles.button, styles.buttonSave]}
-            onPress={handleSaveRun}
-          >
-            <Text style={styles.buttonText}>SAVE RUN</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -296,16 +230,15 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   mainContent: {
-    flexDirection: "row",
     flex: 1,
     padding: 20,
     zIndex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  leftPanel: {
-    flex: 1,
+  centerPanel: {
     alignItems: "center",
     justifyContent: "center",
-    paddingRight: 20,
   },
   teamBox: {
     backgroundColor: COLORS.teamBoxBlue,
@@ -362,34 +295,27 @@ const styles = StyleSheet.create({
   statusStopped: {
     backgroundColor: "#EF4444",
   },
-  rightPanel: {
-    flex: 1,
-    paddingLeft: 20,
+  timerButtons: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 16,
   },
-  videoContainer: {
-    flex: 1,
-    backgroundColor: COLORS.darkBlue,
-    borderRadius: 8,
-    overflow: "hidden",
-    borderWidth: 3,
+  timerButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 4,
+    borderWidth: 2,
     borderColor: COLORS.white,
   },
-  videoStream: {
-    width: "100%",
-    height: "100%",
+  timerButtonStart: {
+    backgroundColor: "#22C55E",
   },
-  videoOverlay: {
-    position: "absolute",
-    top: 10,
-    right: 10,
+  timerButtonEnd: {
     backgroundColor: "#EF4444",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
   },
-  videoOverlayText: {
+  timerButtonText: {
     color: COLORS.white,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "bold",
   },
   breakdownContainer: {
@@ -458,18 +384,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 2,
     borderColor: COLORS.white,
-  },
-  buttonPrimary: {
-    backgroundColor: COLORS.yellow,
-  },
-  buttonActive: {
-    backgroundColor: COLORS.yellow,
-  },
-  buttonSmall: {
-    paddingHorizontal: 16,
-  },
-  buttonSave: {
-    backgroundColor: "#22C55E",
   },
   buttonText: {
     color: COLORS.white,

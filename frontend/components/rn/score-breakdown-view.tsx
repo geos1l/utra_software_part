@@ -59,10 +59,10 @@ export function ScoreBreakdownView({ backgroundNumber = "8" }: ScoreBreakdownVie
 
       {/* Main Content */}
       <View style={styles.mainContent}>
-        {/* Team Info Panel */}
+        {/* Team Info Panel - same team number as live page (backgroundNumber) */}
         <View style={styles.teamPanel}>
           <View style={styles.teamBox}>
-            <Text style={styles.teamNumber}>{state.teamNumber}</Text>
+            <Text style={styles.teamNumber}>{backgroundNumber || "—"}</Text>
           </View>
           <Text style={styles.scoreLabel}>TOTAL SCORE</Text>
           <Text style={styles.score}>{totalScore}</Text>

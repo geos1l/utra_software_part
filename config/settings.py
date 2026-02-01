@@ -19,8 +19,9 @@ class Settings:
     ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
     ELEVENLABS_VOICE = os.getenv("ELEVENLABS_VOICE", "josh")
 
-    # Timer: key press to start (detected in backend, not browser)
+    # Timer: key press to start/end (detected in backend when running)
     TIMER_START_KEY = os.getenv("TIMER_START_KEY", "space")
+    TIMER_STOP_KEY = os.getenv("TIMER_STOP_KEY", "escape")
 
     # Team number: set before each match (default from env; can override via API)
     TEAM_NUMBER = os.getenv("TEAM_NUMBER", "1")

@@ -11,7 +11,7 @@ class MatchState:
     """Single source of truth for match state. Thread-safe."""
 
     def __init__(self):
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # RLock so get_state() can call get_elapsed_s() etc. without deadlock
         self.timer_started_at: float | None = None
         self.team_number: str = "1"
         self.obstacle_touches: int = 0
@@ -20,10 +20,15 @@ class MatchState:
         self._leaderboard: list[dict[str, Any]] = []
 
     def set_timer_started(self) -> None:
-        """Start the timer (call on key press). Idempotent after first call."""
+        """Start the match timer (call on key press or button). Idempotent after first call."""
         with self._lock:
             if self.timer_started_at is None:
                 self.timer_started_at = time.time()
+
+    def set_timer_stopped(self) -> None:
+        """End the match timer (stops and resets elapsed to 0 for next match)."""
+        with self._lock:
+            self.timer_started_at = None
 
     def set_team_number(self, team_number: str | int) -> None:
         with self._lock:
