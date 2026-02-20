@@ -6,7 +6,7 @@ from .commentary_ai import CommentaryAI
 from .tts import TTSSpeaker
 
 # Same neutral intro every time (like real sports commentators).
-INTRO_LINE = "And we're off!"
+INTRO_LINE = "And we're off!" #This should happen when the timer starts
 
 
 class CommentaryRunner:
@@ -37,14 +37,13 @@ class CommentaryRunner:
             self._buffer.append(payload)
 
     def reset_for_new_match(self) -> None:
-        """Call when timer is reset / new match started. Allows commentary again; clears buffered payloads; intro can play again on next Start."""
+        """Call when timer is reset / new match started. Allows commentary again; clears buffered payloads."""
         with self._lock:
             self._match_ended_done = False
-            self._intro_done = False
             self._buffer.clear()
 
     def play_intro(self) -> None:
-        """Play the same neutral intro once per match (call when timer starts, not at backend startup)."""
+        """Play the same neutral intro once (call at startup)."""
         with self._lock:
             if self._intro_done:
                 return
@@ -79,9 +78,7 @@ class CommentaryRunner:
                 self._in_flight = False
             return False
         any_match_ended = any(p.get("match_ended") for p in payloads)
-        # Coalesce: send only the latest state so rapid events (e.g. 5 touches) get one comment
-        payload_to_send = payloads[-1]
-        text = self.commentary_ai.generate_commentary(payload_to_send)
+        text = self.commentary_ai.generate_commentary(payloads)
         self._last_commentary_time = time.time()
         if text:
             while self.tts.is_playing():

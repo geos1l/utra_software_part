@@ -19,7 +19,7 @@ This project can store saved runs in **MongoDB Atlas** (or any MongoDB server). 
    MONGODB_DB_NAME=utra_match
    MONGODB_COLLECTION=matches
    ```
-
+  
    - If you copied the URI from Atlas, it already has your username and a placeholder for the password. Replace `<password>` in that URI with your **actual database user password** (the one you set in Atlas under **Database Access**).
    - Do **not** wrap the value in quotes. One line, no spaces around `=`.
    - `MONGODB_DB_NAME` and `MONGODB_COLLECTION` are optional; defaults are `utra_match` and `matches`.
